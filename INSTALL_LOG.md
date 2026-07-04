@@ -10,3 +10,4 @@
 - 已创建 `.env` 并设置权限为 `600`;仍需填写真实 `DEEPSEEK_API_KEY`、`MOONSHOT_API_KEY`、`LITELLM_MASTER_KEY`、`FEISHU_WEBHOOK`、`GATEWAY_TOKEN`。
 - 已在本地初始化 `state.db`;表为 `tasks`、`events`、`feedback`,journal mode 为 WAL。
 - 腾讯云 Ubuntu 24.04 适配: LiteLLM 安装到项目 `.venv`;`install.sh` 优先使用 `$ROOT/.venv/bin/litellm` 生成 systemd 服务,避免系统 Python `--break-system-packages`。
+- Codex 0.142.5 远端实测: `wire_api = "chat"` 已被拒绝;LiteLLM provider 改为 `wire_api = "responses"`。
