@@ -1,0 +1,9 @@
+.env
+state.db*
+logs/
+traces/
+.dispatch.lock
+.venv/
+.DS_Store
+*.pem
+ecs/*.pem

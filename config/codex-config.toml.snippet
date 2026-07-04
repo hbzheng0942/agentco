@@ -1,0 +1,16 @@
+# ⇩ 追加进 ~/.codex/config.toml(install.sh 自动做,幂等)
+# ---------------------------------------------------------------
+
+[model_providers.litellm]
+name = "litellm"
+base_url = "http://127.0.0.1:4000/v1"
+env_key = "LITELLM_MASTER_KEY"
+wire_api = "chat"
+
+# ---- headless profiles(codex exec -p <name>)----
+# Codex >=0.134 不再从 config.toml 读取 [profiles.*]。
+# install.sh 会把 config/codex-profiles/*.config.toml 安装到 ~/.codex/。
+
+[agents]
+max_threads = 4
+max_depth = 1

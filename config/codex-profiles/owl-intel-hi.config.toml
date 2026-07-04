@@ -1,0 +1,5 @@
+# Tier 1: leave model unset so Codex uses the signed-in account default.
+sandbox_mode = "read-only"
+web_search = "live"
+model_instructions_file = "/opt/agentco/config/profile-instructions/owl-intel.md"
+

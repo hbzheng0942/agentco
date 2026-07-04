@@ -1,0 +1,4 @@
+model = "ds-reasoner"
+model_provider = "litellm"
+sandbox_mode = "read-only"
+

@@ -1,0 +1,31 @@
+# LiteLLM proxy — 统一 OpenAI 兼容入口 http://127.0.0.1:4000/v1
+# 模型ID若官方更名,只改此文件,Codex侧别名不变。
+model_list:
+  - model_name: ds-chat                # 廉价主力:Exec/Router类任务
+    litellm_params:
+      model: deepseek/deepseek-chat    # TODO: 官方最新ID核对(deepseek-v4-pro?)
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: ds-reasoner            # 升级档一:推理
+    litellm_params:
+      model: deepseek/deepseek-reasoner
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: kimi-long              # 长上下文:Intel抓取/论文初筛
+    litellm_params:
+      model: moonshot/kimi-k3          # TODO: 核对最新ID
+      api_key: os.environ/MOONSHOT_API_KEY
+
+router_settings:
+  fallbacks:
+    - kimi-long: ["ds-chat"]           # Kimi挂了降级DeepSeek,保cron不断
+  num_retries: 2
+  timeout: 120
+
+litellm_settings:
+  max_budget: 200          # 月度硬顶(USD),撞顶拒绝请求并报错
+  budget_duration: 30d
+  drop_params: true        # 吞掉厂商不支持的参数,防tool-call格式炸
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

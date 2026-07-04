@@ -1,0 +1,5 @@
+# agentco crontab —— crontab -e 后粘贴(路径改为实际部署根;TZ建议Asia/Shanghai)
+*/5 * * * *  cd /opt/agentco && python3 bin/dispatch.py >> logs/cron.log 2>&1
+0 8 * * *    /opt/agentco/bin/intel_daily.sh >> /opt/agentco/logs/cron.log 2>&1
+0 20 * * 0   /opt/agentco/bin/weekly_critic.sh >> /opt/agentco/logs/cron.log 2>&1
+30 3 * * *   /opt/agentco/bin/backup.sh >> /opt/agentco/logs/cron.log 2>&1
