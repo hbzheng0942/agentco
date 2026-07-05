@@ -13,3 +13,4 @@
 - Codex 0.142.5 远端实测: `wire_api = "chat"` 已被拒绝;LiteLLM provider 改为 `wire_api = "responses"`。
 - LiteLLM 已在腾讯云服务器以 systemd 方式部署,实际版本 `1.90.3`;`install.sh` 已 pin 到 `litellm[proxy]==1.90.3`,避免重跑安装时版本漂移。
 - 2026-07-05 远端健康检查: LiteLLM 服务 active,但 `DEEPSEEK_API_KEY`、`MOONSHOT_API_KEY`、`FEISHU_WEBHOOK` 仍为占位值,模型调用返回 401。
+- Kimi 官方文档核对: API base 为 `https://api.moonshot.cn/v1`,当前模型应使用 `kimi-k2.6` 等模型名;原 `moonshot/kimi-k3` 会走旧/错误 endpoint。`kimi-long` 改为 `openai/kimi-k2.6` + `api_base: https://api.moonshot.cn/v1`。

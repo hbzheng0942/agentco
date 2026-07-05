@@ -13,7 +13,8 @@ model_list:
 
   - model_name: kimi-long              # 长上下文:Intel抓取/论文初筛
     litellm_params:
-      model: moonshot/kimi-k3          # TODO: 核对最新ID
+      model: openai/kimi-k2.6          # Kimi OpenAI-compatible endpoint
+      api_base: https://api.moonshot.cn/v1
       api_key: os.environ/MOONSHOT_API_KEY
 
 router_settings:
