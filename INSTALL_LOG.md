@@ -11,3 +11,5 @@
 - 已在本地初始化 `state.db`;表为 `tasks`、`events`、`feedback`,journal mode 为 WAL。
 - 腾讯云 Ubuntu 24.04 适配: LiteLLM 安装到项目 `.venv`;`install.sh` 优先使用 `$ROOT/.venv/bin/litellm` 生成 systemd 服务,避免系统 Python `--break-system-packages`。
 - Codex 0.142.5 远端实测: `wire_api = "chat"` 已被拒绝;LiteLLM provider 改为 `wire_api = "responses"`。
+- LiteLLM 已在腾讯云服务器以 systemd 方式部署,实际版本 `1.90.3`;`install.sh` 已 pin 到 `litellm[proxy]==1.90.3`,避免重跑安装时版本漂移。
+- 2026-07-05 远端健康检查: LiteLLM 服务 active,但 `DEEPSEEK_API_KEY`、`MOONSHOT_API_KEY`、`FEISHU_WEBHOOK` 仍为占位值,模型调用返回 401。

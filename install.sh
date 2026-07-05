@@ -2,6 +2,7 @@
 # install.sh — 幂等部署(Ubuntu 22/24)。重复执行安全。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
+LITELLM_VERSION="1.90.3"
 echo "== agentco install @ $ROOT =="
 
 # 0. 依赖
@@ -10,7 +11,7 @@ command -v codex   >/dev/null || { echo "need codex: npm i -g @openai/codex && c
 command -v sqlite3 >/dev/null || sudo apt-get install -y sqlite3
 if [ ! -x "$ROOT/.venv/bin/litellm" ] && ! command -v litellm >/dev/null; then
   python3 -m venv "$ROOT/.venv"
-  "$ROOT/.venv/bin/pip" install -U pip 'litellm[proxy]'
+  "$ROOT/.venv/bin/pip" install -U pip "litellm[proxy]==$LITELLM_VERSION"
 fi
 LITELLM_BIN="$ROOT/.venv/bin/litellm"
 [ -x "$LITELLM_BIN" ] || LITELLM_BIN="$(command -v litellm)"
