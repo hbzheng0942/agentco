@@ -2,8 +2,8 @@
 queries:
   - "causal reasoning AI 3D modeling world model application progress"
   - "因果推理 AI 3D建模 世界模型 应用 进展"
-fetch_ts: 2026-07-06T17:54:04+00:00
-content_hash: 329c2ab397c36c15
+fetch_ts: 2026-07-06T18:10:01+00:00
+content_hash: d1f67fd59ba748c4
 kind: search_raw
 project: default
 routes:
@@ -13,7 +13,7 @@ routes:
   brave_web[zh1]: ok(10)
   serper_news[en0]: ok(10)
   serper_news[zh1]: ok(10)
-  serper_web[en0]: ok(9)
+  serper_web[en0]: ok(10)
   serper_web[zh1]: ok(10)
 source_urls:
   - https://samaya.ai/blog/causal-world-models-bridging-ai-and-human-expertise
@@ -38,10 +38,10 @@ source_urls:
 
 > 四路并行(brave web/news + serper web/news)×2 query,加权去重后 top16。单路失败见 frontmatter.routes。模型只读本文件,不得联网;蒸馏时必须评估语言/地域覆盖面(frontmatter 的 queries 与 routes)。
 
-## 1. Samaya AI Blog | Causal World Models: Bridging AI and Human Expertise
+## 1. Causal World Models: Bridging AI and Human Expertise - Samaya AI
 - url: https://samaya.ai/blog/causal-world-models-bridging-ai-and-human-expertise
-- score: 1.2  sources: brave_web, serper_web
-- 摘要: <strong>We built a research prototype to predict data-driven quantitative economic outcomes as a result of an anticipated economic change</strong>. When asked to “predict the impact of reduced immigration on US inflation” the system iteratively creates a ...
+- score: 1.25  sources: brave_web, serper_web
+- 摘要: The causal model provides a computational graph to structure the reasoning process. This model provides a global view to the AI system, allowing it to ...
 
 ## 2. Frontier Systems for the Physical World
 - url: https://a16z.com/frontier-systems-for-the-physical-world/
@@ -78,15 +78,15 @@ source_urls:
 - score: 1.0  sources: serper_web
 - 摘要: 世界模型是理解物理學和空間屬性等真實世界動態的神經網路。這類模型可運用文字、影像、影片和動作等輸入資料，生成模擬逼真物理環境的影片。物理AI 開發人員運用世界 ...
 
-## 9. Causal AI: Current State-of-the-Art & Future Directions | by Alex G. Lee | Medium
+## 9. Causal AI: Current State-of-the-Art & Future Directions - Medium
 - url: https://medium.com/@alexglee/causal-ai-current-state-of-the-art-future-directions-c17ad57ff879
 - score: 0.825  sources: brave_news, brave_web, serper_web
-- 摘要: Causal AI represents a paradigm shift in artificial intelligence by moving beyond traditional pattern recognition to infer and leverage…
+- 摘要: The ability to model causality enables Causal AI to revolutionize fields like healthcare, economics, robotics, and autonomous systems, where ...
 
-## 10. Inducing Causal World Models in LLMs for Zero-Shot ...
+## 10. Inducing Causal World Models in LLMs for Zero-Shot Physical ...
 - url: https://arxiv.org/html/2507.19855v4
 - score: 0.5  sources: serper_web
-- 摘要: This paper introduces Causal World Model Induction (CWMI), a novel framework designed to explicitly embed a model of causal physics within an ...
+- 摘要: We demonstrate that our model significantly outperforms state-of-the-art LLMs on zero-shot physical reasoning benchmarks, such as PIQA, and on ...
 
 ## 11. 世界模型：从虚拟3D到因果推理，AI认知革命的下一站_ai因果推理:google deepmind开发生态变量因果模型,从遥感数据中识别环境变化的驱-CSDN博客
 - url: https://blog.csdn.net/yuntongliangda/article/details/147013219
