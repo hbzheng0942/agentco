@@ -44,6 +44,20 @@ class H(BaseHTTPRequestHandler):
             ok, msg = apply_review(q.get("tid", ""), q.get("action", ""), q.get("note", ""))
             return self._send(200 if ok else 400,
                 f"<html><body style='font-size:22px;padding:40px'>{'✅' if ok else '⚠️'} {msg}</body></html>")
+        if u.path == "/enqueue":   # 日报/TODO 卡片按钮点击直接入队(GATEWAY_TOKEN 鉴权)
+            if not TOKEN or q.get("token") != TOKEN:
+                return self._send(403, "forbidden")
+            agent = q.get("agent", "")
+            if agent not in VALID_AGENTS:
+                return self._send(400, f"<html><body style='font-size:22px;padding:40px'>⚠️ 未知 agent {agent}(须 {'/'.join(sorted(VALID_AGENTS))})</body></html>")
+            title = (q.get("title") or q.get("body") or "")[:40] or "(无标题)"
+            tid = enqueue(agent, title, q.get("body", title),
+                          project=q.get("project", "default"),
+                          priority=int(q.get("priority", 2) or 2),
+                          depends_on=q.get("depends_on") or None,
+                          query=q.get("query") or None)
+            push(f"📥 已入队 {tid} → {agent}({q.get('project','default')})\n{title}")
+            return self._send(200, f"<html><body style='font-size:22px;padding:40px'>✅ 已入队 {tid} → {agent}</body></html>")
         self._send(404, "404")
 
     def do_POST(self):
