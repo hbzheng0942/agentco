@@ -139,6 +139,8 @@ def t_dispatch():
     h = agentlib.enqueue("retriever", "H", "x", project="assembly", difficulty="heavy")
     check("routing: retriever heavy → kimi-long(tier=2)", tier(h) == 2
           and dispatch.PROFILE[("retriever", 2)] == "retriever-long")
+    check("routing: heavy 缺省 ttl 放宽 1800s",
+          c.execute("SELECT ttl_sec FROM tasks WHERE id=?", (h,)).fetchone()[0] == 1800)
     check("routing: auditor 全档异厂商(恒 qwen-max,无 GPT 档)",
           len({dispatch.PROFILE[("auditor", i)] for i in (0, 1, 2)}) == 1)
     check("routing: 失败自动升档已移除", not hasattr(dispatch, "MAX_TIER"))

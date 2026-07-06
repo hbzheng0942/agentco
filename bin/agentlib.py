@@ -60,6 +60,8 @@ def enqueue(agent, title, body, ttl=900, notify=1, spec_path=None,
     if difficulty not in DIFFICULTY:
         raise ValueError(f"difficulty 须为 {'/'.join(DIFFICULTY)},得到 {difficulty!r}")
     tier = DIFFICULTY[difficulty]
+    if difficulty == "heavy" and ttl == 900:
+        ttl = 1800   # heavy=超长上下文蒸馏,缺省 ttl 放宽一倍(显式传 ttl 则尊重)
     c = db()
     # 日期一律用本地时间:SQL 'now' 是 UTC,本地 00:00-08:00 会与 datetime.now() 差一天,
     # LIKE 模式与生成的 id 日期不一致 → 序号从 0 重数 → 主键冲突(2026-07-07 selftest 实锤)

@@ -2,8 +2,8 @@
 queries:
   - "causal reasoning AI 3D modeling world model application progress"
   - "因果推理 AI 3D建模 世界模型 应用 进展"
-fetch_ts: 2026-07-06T17:39:02+00:00
-content_hash: bb26455f3b653945
+fetch_ts: 2026-07-06T17:54:04+00:00
+content_hash: 329c2ab397c36c15
 kind: search_raw
 project: default
 routes:
@@ -13,7 +13,7 @@ routes:
   brave_web[zh1]: ok(10)
   serper_news[en0]: ok(10)
   serper_news[zh1]: ok(10)
-  serper_web[en0]: ok(10)
+  serper_web[en0]: ok(9)
   serper_web[zh1]: ok(10)
 source_urls:
   - https://samaya.ai/blog/causal-world-models-bridging-ai-and-human-expertise
@@ -30,8 +30,8 @@ source_urls:
   - https://causalworldmodel.com/causal-jepa-a-new-causal-world-model-for-ai-agents
   - https://medium.com/@adnanmasood/leworldmodel-and-the-case-for-stable-latent-world-models-0e4c33ca0f3c
   - https://news.qq.com/rain/a/20260630A05TDI00
-  - https://www.ccf.org.cn/YOCSEF/News/2025-10-12/849421.shtml
   - https://zhuanlan.zhihu.com/p/2024999051473494594
+  - https://zhuanlan.zhihu.com/p/670574382
 ---
 
 # 搜索原料:causal reasoning AI 3D modeling world model application progress / 因果推理 AI 3D建模 世界模型 应用 进展
@@ -80,13 +80,13 @@ source_urls:
 
 ## 9. Causal AI: Current State-of-the-Art & Future Directions | by Alex G. Lee | Medium
 - url: https://medium.com/@alexglee/causal-ai-current-state-of-the-art-future-directions-c17ad57ff879
-- score: 0.8111  sources: brave_news, brave_web, serper_web
+- score: 0.825  sources: brave_news, brave_web, serper_web
 - 摘要: Causal AI represents a paradigm shift in artificial intelligence by moving beyond traditional pattern recognition to infer and leverage…
 
-## 10. Inducing Causal World Models in LLMs for Zero-Shot Physical ...
+## 10. Inducing Causal World Models in LLMs for Zero-Shot ...
 - url: https://arxiv.org/html/2507.19855v4
 - score: 0.5  sources: serper_web
-- 摘要: We demonstrate that our model significantly outperforms state-of-the-art LLMs on zero-shot physical reasoning benchmarks, such as PIQA, and on ...
+- 摘要: This paper introduces Causal World Model Induction (CWMI), a novel framework designed to explicitly embed a model of causal physics within an ...
 
 ## 11. 世界模型：从虚拟3D到因果推理，AI认知革命的下一站_ai因果推理:google deepmind开发生态变量因果模型,从遥感数据中识别环境变化的驱-CSDN博客
 - url: https://blog.csdn.net/yuntongliangda/article/details/147013219
@@ -108,12 +108,12 @@ source_urls:
 - score: 0.5  sources: serper_news
 - 摘要: 2026年，人工智能领域正在经历一场深刻的范式转移。当大语言模型将数字世界的文本处理能力推向极致之后，行业的共识已清晰指向下一个核心赛场——物理世界...
 
-## 15. 大模型技术演进：世界模型让人工智能从感知走向认知与决策
-- url: https://www.ccf.org.cn/YOCSEF/News/2025-10-12/849421.shtml
-- score: 0.5  sources: brave_web, serper_web
-- 摘要: 1. 世界模型是通向AGI的必要但不充分条件：世界模型通过预测环境演化、支持决策与交互，为AGI提供基础能力，尤其在具身智能中不可或缺。然而，仅靠世界模型 ...
-
-## 16. 回看世界模型8 年进展，始终没突破的瓶颈是什么？ - 知乎专栏
+## 15. 回看世界模型8 年进展，始终没突破的瓶颈是什么？ - 知乎专栏
 - url: https://zhuanlan.zhihu.com/p/2024999051473494594
 - score: 0.5  sources: serper_web
 - 摘要: 随着大规模生成模型、多模态基础模型与强化学习技术的突破，世界模型的应用边界被持续拓宽，从早期的游戏仿真，延伸至机器人操控、自动驾驶决策、生命科学 ...
+
+## 16. 国内外知名大模型及应用——模型/应用维度（2026/07/02） - 知乎
+- url: https://zhuanlan.zhihu.com/p/670574382
+- score: 0.5  sources: brave_news
+- 摘要: 本周更新（2026/06/29~2026/07/03）：Deepmind：国外闭源组新增图像模型 Gemini 3.1 Flash-Lite Image(Nano Banana 2 Lite)，视频模型 Gemini Omni Lite； *注：目前Agent模型已占大半壁江山，但大类名暂时还叫通…

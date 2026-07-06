@@ -156,16 +156,25 @@ def run_task(db, t):
         hb = threading.Timer(hb_sec, feishu,
             [f"⏳ {tid} {t['title']} 仍在运行(已 {hb_sec//60} 分钟,上限 {t['ttl_sec']//60} 分钟)agent={agent}"])
         hb.daemon = True; hb.start()
+    # start_new_session:codex(node→二进制)是多级进程树,超时必须整组杀,
+    # 否则孙进程成孤儿继续烧上游 token(2026-07-07 T-003 实锤:超时后 codex 二进制存活并与重试并跑)
+    p = subprocess.Popen(
+        ["codex", "exec", "-p", profile, "--json",
+         "--cd", str(ROOT), "--output-last-message", str(trace)+".final", "--", spec],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
     try:
-        r = subprocess.run(
-            ["codex", "exec", "-p", profile, "--json",
-             "--cd", str(ROOT), "--output-last-message", str(trace)+".final", "--", spec],
-            capture_output=True, text=True, timeout=t["ttl_sec"])
-        trace.write_text(r.stdout + (f"\n\n# stderr\n{r.stderr}" if r.stderr else ""))
-        ok = r.returncode == 0 and Path(str(trace)+".final").exists()
+        out, err = p.communicate(timeout=t["ttl_sec"])
+        trace.write_text(out + (f"\n\n# stderr\n{err}" if err else ""))
+        ok = p.returncode == 0 and Path(str(trace)+".final").exists()
     except subprocess.TimeoutExpired:
+        import os as _os, signal as _sig
+        try:
+            _os.killpg(p.pid, _sig.SIGKILL)
+        except ProcessLookupError:
+            pass
+        p.communicate()
         ok = False
-        ev(db, tid, agent, "fail", "timeout")
+        ev(db, tid, agent, "fail", "timeout(进程组已整组杀)")
     finally:
         if hb:
             hb.cancel()
