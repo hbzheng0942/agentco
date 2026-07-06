@@ -14,7 +14,8 @@ from agentlib import load_env
 load_env()
 APP_ID = os.environ.get("FEISHU_APP_ID", "")
 APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "")
-FOLDER = os.environ.get("FEISHU_ARCHIVE_FOLDER_TOKEN", "")
+# 容忍误贴完整 URL(https://xx.feishu.cn/drive/folder/<token>):取末段即 token
+FOLDER = os.environ.get("FEISHU_ARCHIVE_FOLDER_TOKEN", "").rstrip("/").rsplit("/", 1)[-1].split("?")[0]
 DOMAIN = os.environ.get("FEISHU_DOMAIN", "feishu.cn")
 if not (APP_ID and APP_SECRET and FOLDER):
     sys.exit(3)
