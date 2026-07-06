@@ -77,7 +77,8 @@ def enqueue(agent, title, body, ttl=900, notify=1, spec_path=None,
     if not spec_path:
         sp = ROOT/"handoff"/project/f"{tid}.md"
         sp.parent.mkdir(parents=True, exist_ok=True)
-        qline = f"query: {query}\n" if query else ""
+        qs = ([query] if isinstance(query, str) else list(query)) if query else []
+        qline = "".join(f"query: {q}\n" for q in qs if q and str(q).strip())
         sp.write_text(f"""---
 id: {tid}
 agent: {agent}

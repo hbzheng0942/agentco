@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from agentlib import ROOT, db, load_env, apply_review, enqueue, verify_sig
+import bridge
 
 load_env()
 TOKEN  = os.environ.get("GATEWAY_TOKEN", "")
@@ -117,6 +118,16 @@ class H(BaseHTTPRequestHandler):
             push(f"🧬 {msg}")
             return self._send(200 if r.returncode == 0 else 400,
                 f"<html><body style='font-size:22px;padding:40px'>{'✅' if r.returncode == 0 else '⚠️'} {msg}</body></html>")
+        if u.path == "/bridge":   # bridge confirm 流:确认入队暂存的拆解方案
+            pid = q.get("id", "")
+            if not (q.get("s") and verify_sig(q["s"], pid, "confirm")):
+                return self._send(403, "forbidden")
+            plan = bridge.pop_plan(pid)
+            if not plan:
+                return self._send(400, "<html><body style='font-size:22px;padding:40px'>⚠️ 方案不存在或已过期</body></html>")
+            reply = bridge.execute_plan(plan)
+            push(reply)
+            return self._send(200, f"<html><body style='font-size:22px;padding:40px'>✅ 已入队,详情见飞书回执</body></html>")
         if u.path == "/api/stats":
             if not self._dash_auth(q):
                 return self._send(403, "{}", "application/json")
@@ -181,24 +192,45 @@ class H(BaseHTTPRequestHandler):
         return self._send(200, json.dumps({"code": 0}), "application/json")
 
     def handle_text(self, text):
-        # 派单(派/请/让 + agent 名,容忍@机器人前缀与自然语言)→ 入队;其余一切 → 90-inbox 异步信箱
+        # 确定性梯度:规则快路径("派 <agent> <任务>"精确格式,零延迟)→ bridge(ds-chat 分诊)
+        # → 规则宽松解析 → inbox。任何一层失败都降级,消息永不丢。
         text = strip_mentions(text)
         if "检测" in text and "入站" in text:
             push("已入站")
             return
-        parsed = parse_dispatch(text)
+        m = re.match(r"^派\s+(\S+)\s+(.+)$", text, re.S)
+        if m and m.group(1) in VALID_AGENTS:   # 快路径:精确格式直通,不花 LLM
+            agent, task = m.group(1), m.group(2).strip()
+            tid = enqueue(agent, task[:40], task, query=(task[:100] if agent == "retriever" else None))
+            push(f"📥 已入队 {tid} → {agent}\n{task[:100]}")
+            return
+        plan = bridge.classify(text)
+        if plan:
+            audit(f"bridge intent={plan['intent']} tasks={len(plan['tasks'])}")
+            if plan["intent"] == "status":
+                push(bridge.answer_status(plan["task_ref"]))
+                return
+            if plan["intent"] == "cancel":
+                push(bridge.cancel_task(plan["task_ref"]))
+                return
+            if plan["intent"] == "dispatch":
+                if bridge.needs_confirm(plan):   # 大批量/heavy:先确认再入队
+                    pid, url = bridge.stash_plan(plan)
+                    push(f"🧾 拆解出 {len(plan['tasks'])} 个任务,含大活,请确认:\n"
+                         f"{bridge.plan_summary(plan)}\n✅ 确认入队 {url}\n(不点=不执行,24h 过期)")
+                else:
+                    push(bridge.execute_plan(plan))
+                return
+            # intent=idea → 落 inbox(带上 bridge 的理解)
+        parsed = parse_dispatch(text)   # bridge 不可用时的规则兜底
         if parsed:
             agent, task = parsed
-            # retriever 必须带 query 走 search 预处理,否则无 raw 只能凭先验编造(宪法禁止)
-            query = task[:100] if agent == "retriever" else None
-            tid = enqueue(agent, task[:40], task, query=query)
-            push(f"📥 已入队 {tid} → {agent}" + (f"(search query 已注入)" if query else "") + f"\n{task[:100]}")
-            return
-        if re.match(r"^派\b|^派\s", text):   # 明确想派单但没解析出合法 agent → 提示格式
-            push(f"⚠️ 没认出 agent。格式:派/请/让 <{'|'.join(sorted(VALID_AGENTS))}> <任务描述>")
+            tid = enqueue(agent, task[:40], task, query=(task[:100] if agent == "retriever" else None))
+            push(f"📥 已入队 {tid} → {agent}(bridge不可用,规则解析)\n{task[:100]}")
             return
         f = ROOT/"kb/90-inbox"/f"idea-{datetime.now():%Y%m%d-%H%M%S}.md"
-        f.write_text(f"---\nsource: feishu\ndate: {datetime.now():%Y-%m-%d %H:%M}\nstatus: raw\n---\n\n{text}\n")
+        note = f"\nbridge_note: {plan['note']}" if plan and plan.get("note") else ""
+        f.write_text(f"---\nsource: feishu\ndate: {datetime.now():%Y-%m-%d %H:%M}\nstatus: raw{note}\n---\n\n{text}\n")
         push(f"📝 已收进 inbox:{text[:60]}")
 
 if __name__ == "__main__":

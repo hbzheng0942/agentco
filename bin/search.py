@@ -47,13 +47,21 @@ def _http(method, url, headers, body=None):
         return json.loads(r.read().decode())
 
 
+_CJK = re.compile(r"[一-鿿]")
+
+def _lang(query):
+    return "zh" if _CJK.search(query) else "en"
+
+
 def brave(kind, query):
     key = os.environ.get("BRAVE_API_KEY", "")
     if not key:
         raise RuntimeError("BRAVE_API_KEY 未配置")
     path = "/res/v1/news/search" if kind == "news" else "/res/v1/web/search"
-    url = "https://api.search.brave.com" + path + "?" + urllib.parse.urlencode(
-        {"q": query, "count": TOPN_PER_ROUTE})
+    params = {"q": query, "count": TOPN_PER_ROUTE}
+    if _lang(query) == "en":   # 英文 query 锚定全球英文语料;中文保持缺省(本土源有独有信息)
+        params.update({"country": "us", "search_lang": "en"})
+    url = "https://api.search.brave.com" + path + "?" + urllib.parse.urlencode(params)
     hdr = {"Accept": "application/json", "X-Subscription-Token": key}
     data = _http("GET", url, hdr)
     # web 结果在 .web.results;news 结果在 .results
@@ -72,7 +80,10 @@ def serper(kind, query):
         raise RuntimeError("SERPER_API_KEY 未配置")
     path = "/news" if kind == "news" else "/search"
     hdr = {"X-API-KEY": key, "Content-Type": "application/json"}
-    data = _http("POST", "https://google.serper.dev" + path, hdr, {"q": query, "num": TOPN_PER_ROUTE})
+    body = {"q": query, "num": TOPN_PER_ROUTE}
+    if _lang(query) == "en":
+        body.update({"gl": "us", "hl": "en"})
+    data = _http("POST", "https://google.serper.dev" + path, hdr, body)
     items = (data.get("news") if kind == "news" else data.get("organic")) or []
     out = []
     for it in items[:TOPN_PER_ROUTE]:
@@ -95,15 +106,27 @@ def _slug(s):
     return (s[:40] or "q").rstrip("-")
 
 
-def run_search(query, project="default", topn=TOPN_FINAL):
+def run_search(query, project="default", topn=None):
+    """query: str 或 [str,...](双语多路:每个 query 各跑四路,跨路跨语加权去重)。"""
+    queries = [query] if isinstance(query, str) else [q for q in query if q and q.strip()]
+    if not queries:
+        raise ValueError("query 为空")
+    if topn is None:
+        topn = min(20, TOPN_FINAL + 4*(len(queries)-1))   # 多 query 适度放宽名额
     fetch_ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
     route_status, agg = {}, {}  # norm_url -> {url,title,snippet,sources:set,score}
-    with cf.ThreadPoolExecutor(max_workers=len(ROUTES)) as ex:
-        futs = {ex.submit(fn, query): name for name, fn in ROUTES.items()}
-        for fut, name in ((f, futs[f]) for f in cf.as_completed(futs)):
+    # label 记账带语言标签(多query时);sources 恒用纯路由名,保证跨语去重聚合
+    jobs = {}
+    for i, q in enumerate(queries):
+        for name, fn in ROUTES.items():
+            label = name if len(queries) == 1 else f"{name}[{_lang(q)}{i}]"
+            jobs[label] = (name, fn, q)
+    with cf.ThreadPoolExecutor(max_workers=min(8, len(jobs))) as ex:
+        futs = {ex.submit(fn, q): (label, name) for label, (name, fn, q) in jobs.items()}
+        for fut, (label, name) in ((f, futs[f]) for f in cf.as_completed(futs)):
             try:
                 results = fut.result()
-                route_status[name] = f"ok({len(results)})"
+                route_status[label] = f"ok({len(results)})"
                 for rank, (u, title, snippet) in enumerate(results):
                     key = normalize_url(u)
                     e = agg.setdefault(key, {"url": u, "title": title, "snippet": snippet,
@@ -115,7 +138,7 @@ def run_search(query, project="default", topn=TOPN_FINAL):
                     if not e["snippet"] and snippet:
                         e["snippet"] = snippet
             except Exception as e:
-                route_status[name] = f"failed: {type(e).__name__}: {str(e)[:120]}"
+                route_status[label] = f"failed: {type(e).__name__}: {str(e)[:120]}"
 
     ranked = sorted(agg.values(), key=lambda e: (-e["score"], e["url"]))[:topn]
     for e in ranked:
@@ -130,18 +153,21 @@ def run_search(query, project="default", topn=TOPN_FINAL):
 
     raw_dir = ROOT / "kb/30-projects" / project / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
-    out_path = raw_dir / f"search-{_slug(query)}-{datetime.now():%Y%m%d}.md"
+    out_path = raw_dir / f"search-{_slug(queries[0])}-{datetime.now():%Y%m%d}.md"
 
-    lines = ["---", f"query: {json.dumps(query, ensure_ascii=False)}", f"fetch_ts: {fetch_ts}",
-             f"content_hash: {content_hash}", "kind: search_raw", f"project: {project}", "routes:"]
-    for name in ROUTES:
-        lines.append(f"  {name}: {route_status.get(name, 'skipped')}")
+    lines = ["---", "queries:"]
+    lines += [f"  - {json.dumps(q, ensure_ascii=False)}" for q in queries]
+    lines += [f"fetch_ts: {fetch_ts}",
+              f"content_hash: {content_hash}", "kind: search_raw", f"project: {project}", "routes:"]
+    for name in sorted(route_status):
+        lines.append(f"  {name}: {route_status[name]}")
     lines.append("source_urls:")
     for e in ranked:
         lines.append(f"  - {e['url']}")
-    lines += ["---", "", f"# 搜索原料:{query}", "",
-              f"> 四路并行(brave web/news + serper web/news),加权去重后 top{len(ranked)}。"
-              f"单路失败见 frontmatter.routes。模型只读本文件,不得联网。", ""]
+    lines += ["---", "", f"# 搜索原料:{' / '.join(queries)}", "",
+              f"> 四路并行(brave web/news + serper web/news)×{len(queries)} query,加权去重后 top{len(ranked)}。"
+              f"单路失败见 frontmatter.routes。模型只读本文件,不得联网;"
+              f"蒸馏时必须评估语言/地域覆盖面(frontmatter 的 queries 与 routes)。", ""]
     for i, e in enumerate(ranked, 1):
         lines.append(f"## {i}. {e['title'] or '(无标题)'}")
         lines.append(f"- url: {e['url']}")
@@ -156,7 +182,7 @@ def run_search(query, project="default", topn=TOPN_FINAL):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--project", default="default")
-    ap.add_argument("--query", required=True)
-    ap.add_argument("--topn", type=int, default=TOPN_FINAL)
+    ap.add_argument("--query", required=True, action="append", help="可重复传入(双语多query)")
+    ap.add_argument("--topn", type=int, default=None)
     a = ap.parse_args()
     print(run_search(a.query, a.project, a.topn))

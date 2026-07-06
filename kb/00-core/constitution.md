@@ -30,6 +30,20 @@
 ## 搜索在 dispatcher 层(非模型工具)
 时效性由 `bin/search.py` 四路 REST(brave/serper × web/news)在 **dispatcher 预处理**阶段保证,
 落 raw;retriever 只读 raw 蒸馏,**模型不联网**。搜索不是模型的一个 tool,是队列前置步骤。
+**query 双语多路**:全球性主题必须含英文 query(en 锚 us/en 语料,zh 补本土独有源),
+跨语加权去重;raw frontmatter 记录 queries+routes,retriever 蒸馏时必须声明覆盖面偏差。
+
+## 解析在网关层(bridge,非 codex worker)
+入站自然语言的意图分类/任务拆解/双语检索词由**网关层一次 ds-chat 调用**(bridge)产出,
+无工具无循环;输出必须过代码白名单校验(agent/难度/意图全枚举)。确定性梯度:
+精确格式规则直通 → bridge → 规则兜底 → inbox,任何一层失败降级,**消息永不丢**。
+bridge 只提结构不产内容不评质量;进度/状态数字由代码查 DB 回答,模型不碰。
+拆解 ≥3 任务或含 heavy → 先推方案人确认再入队;用户撤销率入 feedback,auditor 周审 bridge 质量。
+
+## 禁止静默降级(2026-07-06 bwrap 事故教训)
+执行环境缺失(沙箱 shell/raw 原料/依赖工具不可用)时,**必须输出 BLOCKED 并声明缺什么,
+禁止用先验知识补全产出**。"看似完整"的编造产出比失败更危险。auditor 周审固定抽查
+产出与 raw 的引用一致性。
 
 ## skill 心跳(use_count)
 skill frontmatter 带 `created` / `use_count`。dispatch 命中(spec 引用 skill 路径)时记 `skill_hit`

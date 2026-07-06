@@ -77,6 +77,12 @@ def t_search():
     check("search: news 跨源去重(n1 = brave_news+serper_news)", "brave_news, serper_news" in txt)
     check("search: frontmatter 带 content_hash + source_urls",
           re.search(r"content_hash: \w+", txt) and "source_urls:" in txt)
+    # 双语多 query:8 路记账带语言标签,sources 仍纯路由名(跨语聚合去重)
+    p2 = search.run_search(["news 测试", "news test"], project="p")
+    t2 = (r / p2).read_text()
+    check("search: 双语8路记账+跨语聚合",
+          "brave_web[zh0]: ok(2)" in t2 and "brave_web[en1]: ok(2)" in t2
+          and "sources: brave_news, brave_web, serper_web" in t2)
     shutil.rmtree(r, ignore_errors=True)
 
 
@@ -244,6 +250,28 @@ def t_gateway_parse():
     check("gateway: 未知 agent 不入队", g.parse_dispatch("派 foo 干活") is None)
 
 
+def t_bridge():
+    import bridge
+    ok = bridge.validate_plan({"intent": "dispatch", "note": "n", "tasks": [
+        {"agent": "retriever", "title": "全球因果推理调研", "body": "目标...验收...",
+         "difficulty": "light", "query_zh": "因果推理 3D建模", "query_en": "causal reasoning 3D generation"},
+        {"agent": "executor", "title": "整理", "body": "把上面产出归档", "depends_idx": 0}]})
+    check("bridge: 合法方案通过+en优先+别名规整",
+          ok and ok["tasks"][0]["queries"][0].startswith("causal") and
+          ok["tasks"][1]["agent"] == "executor-code" and ok["tasks"][1]["depends_idx"] == 0)
+    check("bridge: 未知agent整方案拒绝",
+          bridge.validate_plan({"intent": "dispatch", "tasks": [{"agent": "root", "body": "rm -rf"}]}) is None)
+    check("bridge: 非法intent拒绝", bridge.validate_plan({"intent": "shell", "tasks": []}) is None)
+    check("bridge: 伪造task_ref格式丢弃",
+          bridge.validate_plan({"intent": "status", "task_ref": "../../etc/passwd"})["task_ref"] is None)
+    check("bridge: depends_idx 前向引用置空",
+          bridge.validate_plan({"intent": "dispatch", "tasks": [
+              {"agent": "digester", "body": "x", "depends_idx": 3}]})["tasks"][0]["depends_idx"] is None)
+    check("bridge: retriever 无query时回退标题",
+          bridge.validate_plan({"intent": "dispatch", "tasks": [
+              {"agent": "retriever", "title": "查A", "body": "b"}]})["tasks"][0]["queries"] == ["查A"])
+
+
 def t_kb_lint():
     r = Path(tempfile.mkdtemp(prefix="agentco-kblint-"))
     import kb_lint
@@ -260,7 +288,7 @@ def t_kb_lint():
 
 if __name__ == "__main__":
     for fn in (t_schema, t_search, t_dispatch, t_cache_gc, t_shared, t_brief, t_sign, t_proposals,
-               t_gateway_parse, t_kb_lint):
+               t_gateway_parse, t_bridge, t_kb_lint):
         try:
             fn()
         except Exception as e:

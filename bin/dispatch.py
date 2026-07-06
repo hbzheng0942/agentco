@@ -112,14 +112,15 @@ def canonical_envelope(t, profile, urls, chash, artifacts):
 
 # ---- retriever 预处理:跑 search.py,把 raw 路径注入上下文 ----
 def search_preprocess(db, t, spec):
-    m = re.search(r"^query:\s*(.+?)\s*$", spec, re.M)
-    if not m:
+    # query 行可多条(bridge 生成双语:query: / query_en: / query_zh: 都认)
+    queries = [q.strip().strip('"').strip("'")
+               for q in re.findall(r"^query(?:_[a-z]+)?:\s*(.+?)\s*$", spec, re.M) if q.strip()]
+    if not queries:
         log(f"{t['id']} retriever 无 query 字段,跳过搜索预处理")
         return spec
-    query = m.group(1).strip().strip('"').strip("'")
     try:
         from search import run_search
-        raw = run_search(query, project=t["project"] or "default")
+        raw = run_search(queries, project=t["project"] or "default")
         ev(db, t["id"], t["agent"], "search", raw)
         log(f"{t['id']} search.py → {raw}")
         return (f"# 已抓取搜索原料(只读它分析,禁止联网)\n路径:{raw}\n"
