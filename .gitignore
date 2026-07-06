@@ -3,6 +3,8 @@ state.db*
 logs/
 traces/
 .dispatch.lock
+__pycache__/
+*.pyc
 .venv/
 .DS_Store
 *.pem
