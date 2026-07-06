@@ -22,7 +22,7 @@
 task_id: <T-xxx>
 agent: digester
 model: <kimi-long|gpt|...>
-tier: <0|1>
+tier: <0|1|2>  # 难度档 light|medium|heavy
 project: <proj>
 depends_on: <raw/上游 task_id>
 source_urls: [继承自源]

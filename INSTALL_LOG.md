@@ -15,3 +15,4 @@
 - 2026-07-05 远端健康检查: LiteLLM 服务 active,但 `DEEPSEEK_API_KEY`、`MOONSHOT_API_KEY`、`FEISHU_WEBHOOK` 仍为占位值,模型调用返回 401。
 - Kimi 官方文档核对: API base 为 `https://api.moonshot.cn/v1`,当前模型应使用 `kimi-k2.6` 等模型名;原 `moonshot/kimi-k3` 会走旧/错误 endpoint。`kimi-long` 改为 `openai/kimi-k2.6` + `api_base: https://api.moonshot.cn/v1`。
 - SSH 暴露后安全加固: 腾讯云服务器已安装并启用 fail2ban sshd jail;SSHD 已关闭密码登录和 root 登录,保留公钥登录;实测 `passwordauthentication no`、`permitrootlogin no`、专用 key 可重新登录。
+- 2026-07-06 难度路由改造: tier 语义改为难度档(0=light/1=medium/2=heavy,入队时定,失败不自动升档);新增 profile `executor-data-hi`(GPT)、`retriever-long`(kimi-long)并已复制到 `~/.codex/`;executor 缺省 medium 走 GPT(Plus 订阅),auditor 恒 ds-reasoner 保持异厂商审查。

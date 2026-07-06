@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   spec_path   TEXT NOT NULL,                 -- handoff/<project>/T-xxx.md
   status      TEXT NOT NULL DEFAULT 'queued',
   -- status: queued|running|review|done|blocked|waiting_dep|waiting_gpu|dep_failed
-  tier        INTEGER NOT NULL DEFAULT 0,    -- 0=cheap 1=escalated
+  tier        INTEGER NOT NULL DEFAULT 0,    -- 难度档:0=light 1=medium 2=heavy(入队时定,失败不自动升)
   attempts    INTEGER NOT NULL DEFAULT 0,
   ttl_sec     INTEGER NOT NULL DEFAULT 900,
   notify      INTEGER NOT NULL DEFAULT 1,    -- push result to feishu

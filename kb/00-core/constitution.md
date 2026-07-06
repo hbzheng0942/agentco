@@ -15,6 +15,17 @@
 - **worker = profile 变体**(同域内因模型/档位不同派生 executor-code / executor-code-hi 等)。
 - **新 profile 准入 = 独立工具或独立模型**;若仅 prompt 差异,应做成 **skill** 而非新 profile。
 
+## 难度路由(多厂商为适配任务难度,非失败兜底)
+- `tier` = 难度档:**0=light / 1=medium / 2=heavy**,由派单方入队时定,**失败不自动升档换厂商**
+  (同档重试 2 次 → blocked 进日报,人裁决后可改难度重派)。
+- **中等及以上难度的 executor 工作走 GPT**(ChatGPT Plus 账号,不过 litellm);light 杂活走 DeepSeek 省配额。
+  executor 缺省 difficulty=medium,其余域缺省 light。
+- 路由表(dispatch.py PROFILE 为准):executor light→ds-chat,medium/heavy→GPT;
+  retriever light/medium→ds-reasoner,heavy→kimi-long(超长 raw);digester light/medium→kimi-long,heavy→GPT;
+  auditor 恒 ds-reasoner——**刻意不给 GPT**:executor 产出走 GPT,审查须异厂商("agent 不得自评"的厂商级延伸)。
+- **多模态仅 GPT 通道可用**(ds/kimi 均纯文本 endpoint):带图任务必须标 medium 及以上。
+- GPT 走 Plus 订阅配额,heavy 靠少而精自律,dispatch 不做配额计数。
+
 ## 搜索在 dispatcher 层(非模型工具)
 时效性由 `bin/search.py` 四路 REST(brave/serper × web/news)在 **dispatcher 预处理**阶段保证,
 落 raw;retriever 只读 raw 蒸馏,**模型不联网**。搜索不是模型的一个 tool,是队列前置步骤。

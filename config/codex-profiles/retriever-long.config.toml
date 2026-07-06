@@ -1,0 +1,6 @@
+# retriever-long — 检索蒸馏重难度档(raw 超长时用,Kimi 256k 上下文;不占 GPT 配额)。
+# 只读 search.py 产出的 raw,不联网。turn 上限 5(ttl_sec 兜底 + instructions 约束)。
+model = "kimi-long"
+model_provider = "litellm"
+sandbox_mode = "read-only"
+model_instructions_file = "/opt/agentco/config/profile-instructions/retriever.md"

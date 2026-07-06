@@ -23,7 +23,7 @@
 task_id: <T-xxx>
 agent: retriever
 model: <ds-reasoner|...>
-tier: <0|1>
+tier: <0|1|2>  # 难度档 light|medium|heavy
 project: <proj>
 depends_on: <上游task_id或null>
 source_urls: [继承自 raw]

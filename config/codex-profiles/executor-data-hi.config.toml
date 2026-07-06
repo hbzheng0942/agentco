@@ -1,0 +1,4 @@
+# executor-data-hi — 数据执行中/重难度档。model 留空 = 用登录的 ChatGPT 账号默认(GPT),不走 litellm。
+# turn 上限 10(ttl_sec 兜底)。
+sandbox_mode = "read-only"
+model_instructions_file = "/opt/agentco/config/profile-instructions/executor.md"

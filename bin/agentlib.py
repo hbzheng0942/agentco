@@ -29,8 +29,19 @@ def _dep_met(c, depends_on):
     r = c.execute("SELECT status FROM tasks WHERE id=?", (depends_on,)).fetchone()
     return bool(r) and r["status"] == "done"
 
+DIFFICULTY = {"light": 0, "medium": 1, "heavy": 2}
+
+def default_difficulty(agent):
+    # executor 默认 medium(走 GPT,HB 拍板"中等及以上难度走 GPT");杂活需显式标 light 省 Plus 配额
+    return "medium" if agent in ("executor-code", "executor-data") else "light"
+
 def enqueue(agent, title, body, ttl=900, notify=1, spec_path=None,
-            project="default", priority=2, depends_on=None, query=None):
+            project="default", priority=2, depends_on=None, query=None,
+            difficulty=None):
+    difficulty = difficulty or default_difficulty(agent)
+    if difficulty not in DIFFICULTY:
+        raise ValueError(f"difficulty 须为 {'/'.join(DIFFICULTY)},得到 {difficulty!r}")
+    tier = DIFFICULTY[difficulty]
     c = db()
     last = c.execute("SELECT MAX(CAST(substr(id,-3) AS INTEGER)) FROM tasks "
                      "WHERE id LIKE 'T-'||strftime('%Y%m%d','now')||'-%'").fetchone()[0] or 0
@@ -52,6 +63,7 @@ agent: {agent}
 title: {title}
 project: {project}
 priority: {priority}
+difficulty: {difficulty}
 depends_on: {depends_on or ''}
 {qline}---
 # 任务
@@ -62,10 +74,10 @@ depends_on: {depends_on or ''}
 - 末尾必附 envelope(task_id/agent/model/tier/project/source_urls/content_hash/depends_on/artifacts)
 """)
         spec_path = str(sp.relative_to(ROOT))
-    c.execute("INSERT INTO tasks(id,agent,title,spec_path,ttl_sec,notify,status,project,priority,depends_on) "
-              "VALUES(?,?,?,?,?,?,?,?,?,?)",
-              (tid, agent, title, spec_path, ttl, notify, status, project, priority, depends_on))
-    ev(c, tid, agent, "enqueue", f"status={status} project={project} pri={priority}"
+    c.execute("INSERT INTO tasks(id,agent,title,spec_path,ttl_sec,notify,status,project,priority,depends_on,tier) "
+              "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+              (tid, agent, title, spec_path, ttl, notify, status, project, priority, depends_on, tier))
+    ev(c, tid, agent, "enqueue", f"status={status} project={project} pri={priority} diff={difficulty}"
        + (f" dep={depends_on}" if depends_on else ""))
     c.commit()
     return tid

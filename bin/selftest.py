@@ -108,6 +108,16 @@ def t_dispatch():
     dispatch.record_skill_hits(db, "T-x", "digester", "用 agents/digester/skills/scribe/SKILL.md")
     hit = db.execute("SELECT count(*) FROM events WHERE kind='skill_hit' AND detail='scribe'").fetchone()[0]
     check("dispatch: skill_hit 计数 + use_count bump", hit == 1 and "use_count: 1" in (sk/"SKILL.md").read_text())
+    # 难度路由:executor 缺省 medium(GPT),其余缺省 light;显式 heavy 可用;失败不升档(escalate 分支已移除)
+    tier = lambda tid: c.execute("SELECT tier FROM tasks WHERE id=?", (tid,)).fetchone()[0]
+    check("routing: executor 缺省 medium(tier=1→GPT)", tier(d) == 1
+          and dispatch.PROFILE[("executor-code", 1)] == "executor-code-hi")
+    h = agentlib.enqueue("retriever", "H", "x", project="assembly", difficulty="heavy")
+    check("routing: retriever heavy → kimi-long(tier=2)", tier(h) == 2
+          and dispatch.PROFILE[("retriever", 2)] == "retriever-long")
+    check("routing: auditor 全档异厂商(恒 ds-reasoner,无 GPT 档)",
+          len({dispatch.PROFILE[("auditor", i)] for i in (0, 1, 2)}) == 1)
+    check("routing: 失败自动升档已移除", not hasattr(dispatch, "MAX_TIER"))
     shutil.rmtree(r, ignore_errors=True)
 
 

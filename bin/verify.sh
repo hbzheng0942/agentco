@@ -25,6 +25,7 @@ done
 # 3. Codex headless auth + 经 LiteLLM 跑国产模型(新 profile)
 ck "codex headless auth" "codex exec 'reply exactly: AUTH_OK' 2>/dev/null | grep -q AUTH_OK"
 ck "codex -p auditor via litellm" "codex exec -p auditor --skip-git-repo-check 'reply exactly: LITELLM_OK' 2>/dev/null | grep -q LITELLM_OK"
+ck "难度路由 profile 已装(executor-data-hi/retriever-long)" "test -f ~/.codex/executor-data-hi.config.toml && test -f ~/.codex/retriever-long.config.toml"
 echo "→ 手动:codex exec -p retriever '报告cwd和可见目录' 确认沙箱边界;确认 retriever 无联网(trace 无 web_search)"
 
 # 4. tool-call 压测

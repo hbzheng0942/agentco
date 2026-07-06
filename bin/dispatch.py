@@ -10,6 +10,8 @@ Wave③ 变更:
 - 依赖边:任务 done→扫 waiting_dep(depends_on==该 tid)→queued+dep_triggered;任务 blocked→下游标 dep_failed 进日报。
 - 3D:executor-3d 入队即 waiting_gpu,不进主循环(bin/gpu_worker.sh 本地拉取)。
 - skill_hit:spec 引用 skill 路径时记 event 并 bump use_count。
+- 难度路由(Wave③后修订):tier=难度档(0=light 1=medium 2=heavy),派单时定;
+  失败同档重试 2 次即 blocked,不再自动升档换厂商。
 """
 import fcntl, re, sqlite3, subprocess, sys
 from datetime import datetime
@@ -21,15 +23,18 @@ load_env()  # cron 环境无 .env 变量;codex/feishu_card 子进程靠继承 os
 
 ROOT = Path(__file__).resolve().parent.parent
 DB, TRACES, LOG = ROOT/"state.db", ROOT/"traces", ROOT/"logs/dispatch.log"
-MAX_ATTEMPTS_PER_TIER, MAX_TIER = 2, 1
+MAX_ATTEMPTS = 2
 
-PROFILE = {  # (agent, tier) -> codex profile;无 -hi 的域两档同 profile
-    ("retriever", 0): "retriever",         ("retriever", 1): "retriever",
-    ("executor-code", 0): "executor-code", ("executor-code", 1): "executor-code-hi",
-    ("executor-data", 0): "executor-data", ("executor-data", 1): "executor-data",
-    ("executor-3d", 0): "executor-3d",     ("executor-3d", 1): "executor-3d",
-    ("digester", 0): "digester",           ("digester", 1): "digester-hi",
-    ("auditor", 0): "auditor",             ("auditor", 1): "auditor",
+# 难度路由:tier=难度档(0=light 1=medium 2=heavy),入队时定,失败不自动升档。
+# 多模态仅 GPT 通道(-hi profile)可用;auditor 刻意不给 GPT(审 executor 产出须异厂商)。
+DIFF = {0: "light", 1: "medium", 2: "heavy"}
+PROFILE = {  # (agent, tier) -> codex profile
+    ("retriever", 0): "retriever",         ("retriever", 1): "retriever",         ("retriever", 2): "retriever-long",
+    ("executor-code", 0): "executor-code", ("executor-code", 1): "executor-code-hi", ("executor-code", 2): "executor-code-hi",
+    ("executor-data", 0): "executor-data", ("executor-data", 1): "executor-data-hi", ("executor-data", 2): "executor-data-hi",
+    ("executor-3d", 0): "executor-3d",     ("executor-3d", 1): "executor-3d",     ("executor-3d", 2): "executor-3d",
+    ("digester", 0): "digester",           ("digester", 1): "digester",           ("digester", 2): "digester-hi",
+    ("auditor", 0): "auditor",             ("auditor", 1): "auditor",             ("auditor", 2): "auditor",
 }
 VALID_AGENTS = {"retriever", "executor-code", "executor-data", "executor-3d", "digester", "auditor"}
 INBOX_AGENTS = {"retriever", "digester", "auditor"}   # 产出→inbox&done;其余(executor)→review
@@ -122,16 +127,14 @@ def run_task(db, t):
                 subprocess.run([sys.executable, str(ROOT/"bin/feishu_card.py"),
                                 tid, t["title"], final[:600]], check=False)
             else:
-                feishu(f"✅ {tid} {t['title']}\nagent={agent} tier={tier}\n---\n{final[:800]}")
+                feishu(f"✅ {tid} {t['title']}\nagent={agent} difficulty={DIFF.get(tier, tier)}\n---\n{final[:800]}")
     else:
         attempts = t["attempts"]+1
-        if attempts >= MAX_ATTEMPTS_PER_TIER and tier < MAX_TIER:
-            db.execute("UPDATE tasks SET tier=tier+1,attempts=0,status='queued',updated_at=datetime('now') WHERE id=?", (tid,))
-            ev(db, tid, agent, "escalate", f"tier{tier}->{tier+1}"); log(f"{tid} escalated")
-        elif attempts >= MAX_ATTEMPTS_PER_TIER:
+        # 失败不换厂商:难度是入队时已知的任务属性,失败是给人看的信号(裁决后可改难度重派)
+        if attempts >= MAX_ATTEMPTS:
             db.execute("UPDATE tasks SET status='blocked',attempts=?,updated_at=datetime('now') WHERE id=?", (attempts, tid))
-            ev(db, tid, agent, "block", "max attempts at max tier")
-            feishu(f"🛑 {tid} {t['title']} BLOCKED,需人工。trace: {trace}")
+            ev(db, tid, agent, "block", f"max attempts at difficulty={DIFF.get(tier, tier)}")
+            feishu(f"🛑 {tid} {t['title']} BLOCKED,需人工裁决(可改难度重派)。trace: {trace}")
             propagate_block(db, t)
         else:
             db.execute("UPDATE tasks SET attempts=?,status='queued',updated_at=datetime('now') WHERE id=?", (attempts, tid))

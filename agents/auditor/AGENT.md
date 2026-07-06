@@ -19,7 +19,7 @@
 task_id: <T-xxx>
 agent: auditor
 model: <ds-reasoner|...>
-tier: <0|1>
+tier: <0|1|2>  # 难度档 light|medium|heavy
 project: <proj|system>
 depends_on: null
 source_urls: []
