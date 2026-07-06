@@ -14,7 +14,11 @@
 | source_urls(来源链) | bin/search.py | global | content_hash, raw |
 | 工具域(域=工具边界) | kb/00-core/constitution.md#工具域切分 | global | worker, profile |
 | worker(=profile 变体) | config/codex-profiles/ | global | 工具域, tier |
-| tier(0廉价/1升级) | bin/dispatch.py | global | worker, escalate |
+| tier(难度档 0=light/1=medium/2=heavy) | kb/00-core/constitution.md#难度路由 | global | worker, difficulty |
+| 代号 Scout(=retriever) | agents/retriever/AGENT.md | global | 工具域, Forge, Alembic, Razor |
+| 代号 Forge(=executor) | agents/executor/AGENT.md | global | 工具域, Scout, Alembic, Razor |
+| 代号 Alembic(=digester) | agents/digester/AGENT.md | global | 工具域, Scout, Forge, Razor |
+| 代号 Razor(=auditor) | agents/auditor/AGENT.md | global | 工具域, Scout, Forge, Alembic |
 | 依赖边(depends_on) | bin/dispatch.py | global | dep_triggered, dep_failed, waiting_dep |
 | skill 心跳(use_count) | kb/00-core/constitution.md#skill心跳 | global | skill_hit |
 | 搜索层(dispatcher 非模型工具) | bin/search.py | global | raw, retriever |
