@@ -1,0 +1,7 @@
+# executor-3d — 占位 TODO。云端 Blender 未安装。
+# dispatch.py 对 executor-3d 任务不进主循环:入队即 status=waiting_gpu,由 bin/gpu_worker.sh
+# 在本地 M4 开机手动拉取执行(见 AGENT.md §3D 异步)。此 profile 保留以备将来云端 Blender 就位。
+model = "ds-chat"
+model_provider = "litellm"
+sandbox_mode = "read-only"
+model_instructions_file = "/opt/agentco/config/profile-instructions/executor.md"

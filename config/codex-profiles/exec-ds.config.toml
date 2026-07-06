@@ -1,4 +1,0 @@
-model = "ds-chat"
-model_provider = "litellm"
-sandbox_mode = "read-only"
-

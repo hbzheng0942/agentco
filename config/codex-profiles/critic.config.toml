@@ -1,5 +1,0 @@
-model = "ds-reasoner"
-model_provider = "litellm"
-sandbox_mode = "read-only"
-model_instructions_file = "/opt/agentco/config/profile-instructions/critic.md"
-

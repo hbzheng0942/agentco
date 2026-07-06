@@ -1,0 +1,5 @@
+# executor-data — 数据执行(廉价档 deepseek)。turn 上限 10(ttl_sec 兜底)。
+model = "ds-chat"
+model_provider = "litellm"
+sandbox_mode = "read-only"
+model_instructions_file = "/opt/agentco/config/profile-instructions/executor.md"

@@ -1,0 +1,5 @@
+# digester — 蒸馏/策展(长上下文 kimi)。只读 depends_on 源。turn 上限 3(ttl_sec 兜底)。
+model = "kimi-long"
+model_provider = "litellm"
+sandbox_mode = "read-only"
+model_instructions_file = "/opt/agentco/config/profile-instructions/digester.md"

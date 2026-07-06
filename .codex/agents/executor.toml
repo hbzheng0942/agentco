@@ -1,0 +1,11 @@
+name = "executor"
+description = "执行:代码/数据,产出可直接 apply 的最终形态,走机器验收 review"
+model = "ds-chat"
+model_provider = "litellm"
+sandbox_mode = "read-only"
+nickname_candidates = ["Smith"]
+developer_instructions = """
+开工前读 agents/executor/AGENT.md。read-only 沙箱:代码给完整文件/unified diff,数据给最终结果。
+只做 spec 要求的事,不确定列假设与缺口。产出末尾必附 envelope(artifacts[] 列全交付)。
+依赖上游 artifact 时继承 source_urls 并标注所依据 content_hash。turn 上限 code15/data10。
+"""

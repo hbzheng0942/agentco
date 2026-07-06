@@ -1,0 +1,5 @@
+# auditor — 系统审计(ds-reasoner,异厂商保持苛刻)。只读。turn 上限 5(ttl_sec 兜底)。
+model = "ds-reasoner"
+model_provider = "litellm"
+sandbox_mode = "read-only"
+model_instructions_file = "/opt/agentco/config/profile-instructions/auditor.md"

@@ -1,0 +1,6 @@
+# retriever — 检索蒸馏。只读 search.py 产出的 raw,不联网。
+# turn 上限 5:codex 0.142.5 无原生 max_turns 字段(已 VERIFY),经 dispatcher ttl_sec 兜底 + instructions 约束。
+model = "ds-reasoner"
+model_provider = "litellm"
+sandbox_mode = "read-only"
+model_instructions_file = "/opt/agentco/config/profile-instructions/retriever.md"

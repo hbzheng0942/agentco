@@ -17,7 +17,7 @@ load_env()
 TOKEN  = os.environ.get("GATEWAY_TOKEN", "")
 VERIFY = os.environ.get("FEISHU_VERIFY_TOKEN", "")
 BIND   = os.environ.get("GATEWAY_BIND", "127.0.0.1:9000")
-VALID_AGENTS = {"owl-intel", "exec-ds", "critic"}
+VALID_AGENTS = {"retriever", "executor-code", "executor-data", "executor-3d", "digester", "auditor"}
 
 def push(text):
     subprocess.run([str(ROOT/"bin/feishu_push.sh"), text], check=False)
