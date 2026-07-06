@@ -231,6 +231,19 @@ def t_proposals():
     shutil.rmtree(r, ignore_errors=True)
 
 
+def t_gateway_parse():
+    import feishu_gateway as g
+    t = g.strip_mentions("@_user_1 请retriever执行一个信息搜集任务,全球层面因果推理进展")
+    p = g.parse_dispatch(t)
+    check("gateway: @机器人+自然语言'请retriever执行'解析为派单",
+          p and p[0] == "retriever" and p[1].startswith("一个信息搜集任务"))
+    check("gateway: '派 digester xx' 兼容", g.parse_dispatch("派 digester 总结本周") == ("digester", "总结本周"))
+    check("gateway: 裸 executor 别名到 executor-code",
+          g.parse_dispatch("让executor 跑数据清洗")[0] == "executor-code")
+    check("gateway: 非派单句('请注意…')不误入队", g.parse_dispatch("请注意明天的评审") is None)
+    check("gateway: 未知 agent 不入队", g.parse_dispatch("派 foo 干活") is None)
+
+
 def t_kb_lint():
     r = Path(tempfile.mkdtemp(prefix="agentco-kblint-"))
     import kb_lint
@@ -246,7 +259,8 @@ def t_kb_lint():
 
 
 if __name__ == "__main__":
-    for fn in (t_schema, t_search, t_dispatch, t_cache_gc, t_shared, t_brief, t_sign, t_proposals, t_kb_lint):
+    for fn in (t_schema, t_search, t_dispatch, t_cache_gc, t_shared, t_brief, t_sign, t_proposals,
+               t_gateway_parse, t_kb_lint):
         try:
             fn()
         except Exception as e:

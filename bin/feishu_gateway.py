@@ -5,7 +5,7 @@
   GET  /health
 安全:绑127.0.0.1,经Cloudflare Tunnel暴露;/review 需 GATEWAY_TOKEN;/feishu 校验 Verification Token(明文模式,飞书后台不配Encrypt Key)。
 """
-import json, os, subprocess, sys, urllib.parse
+import json, os, re, subprocess, sys, urllib.parse
 import traceback
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -31,6 +31,25 @@ def audit(msg):
 
 def push(text):
     subprocess.run([str(ROOT/"bin/feishu_push.sh"), text], check=False)
+
+# ---- 入站文本解析(模块级,selftest 可测) ----
+_AGENT_ALIAS = {"executor": "executor-code"}   # 裸 executor 缺省代码域
+
+def strip_mentions(text):
+    """群里 @机器人 时 content.text 携带 @_user_N 占位符,剥掉。"""
+    return re.sub(r"@_user_\d+\s*", "", text).strip()
+
+def parse_dispatch(text):
+    """识别派单意图:'派/请/让 <agent> [执行/跑/做] <任务>'(agent 名精确匹配,大小写不敏感)。
+    返回 (agent, task) 或 None(None=不是派单,进 inbox)。"""
+    m = re.match(r"^(?:派|请|让)\s*([A-Za-z0-9\-]+)\s*(?:执行|跑|做)?\s*[,,::]?\s*(.+)$", text, re.S)
+    if not m:
+        return None
+    name = m.group(1).lower()
+    agent = name if name in VALID_AGENTS else _AGENT_ALIAS.get(name)
+    if not agent or not m.group(2).strip():
+        return None
+    return agent, m.group(2).strip()
 
 def _spend():
     import glob
@@ -162,17 +181,21 @@ class H(BaseHTTPRequestHandler):
         return self._send(200, json.dumps({"code": 0}), "application/json")
 
     def handle_text(self, text):
-        # "派 owl-intel 调研xxx" → 入队;其余一切 → 90-inbox 异步信箱
+        # 派单(派/请/让 + agent 名,容忍@机器人前缀与自然语言)→ 入队;其余一切 → 90-inbox 异步信箱
+        text = strip_mentions(text)
         if "检测" in text and "入站" in text:
             push("已入站")
             return
-        if text.startswith("派 ") or text.startswith("派"):
-            parts = text.lstrip("派").strip().split(maxsplit=1)
-            if len(parts) == 2 and parts[0] in VALID_AGENTS:
-                tid = enqueue(parts[0], parts[1][:40], parts[1])
-                push(f"📥 已入队 {tid} → {parts[0]}\n{parts[1][:100]}")
-                return
-            push(f"⚠️ 格式:派 <{'|'.join(sorted(VALID_AGENTS))}> <任务描述>")
+        parsed = parse_dispatch(text)
+        if parsed:
+            agent, task = parsed
+            # retriever 必须带 query 走 search 预处理,否则无 raw 只能凭先验编造(宪法禁止)
+            query = task[:100] if agent == "retriever" else None
+            tid = enqueue(agent, task[:40], task, query=query)
+            push(f"📥 已入队 {tid} → {agent}" + (f"(search query 已注入)" if query else "") + f"\n{task[:100]}")
+            return
+        if re.match(r"^派\b|^派\s", text):   # 明确想派单但没解析出合法 agent → 提示格式
+            push(f"⚠️ 没认出 agent。格式:派/请/让 <{'|'.join(sorted(VALID_AGENTS))}> <任务描述>")
             return
         f = ROOT/"kb/90-inbox"/f"idea-{datetime.now():%Y%m%d-%H%M%S}.md"
         f.write_text(f"---\nsource: feishu\ndate: {datetime.now():%Y-%m-%d %H:%M}\nstatus: raw\n---\n\n{text}\n")
