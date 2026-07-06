@@ -39,6 +39,15 @@ CREATE TABLE IF NOT EXISTS seen_events (     -- 幂等标记:依赖触发/一次
   ts  TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS proposals (       -- 进化闭环:auditor 提议→人裁决→apply→复检,全程可追踪
+  id TEXT PRIMARY KEY,                        -- P-YYYYWW-NN
+  week TEXT, title TEXT, target TEXT,         -- target=建议改动的文件/资产
+  diff TEXT,                                  -- 可直接应用的最终文本/说明
+  status TEXT DEFAULT 'proposed',             -- proposed|adopted|rejected|applied|verified
+  src_task TEXT, apply_task TEXT, note TEXT,  -- 提议来源任务 / 采纳后生成的执行任务
+  ts TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_tasks_status   ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_depends  ON tasks(depends_on);
 CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority, created_at);

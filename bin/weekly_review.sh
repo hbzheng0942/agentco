@@ -13,6 +13,8 @@ SKILL_HITS=$(sqlite3 state.db "SELECT detail||' | hits='||COUNT(*) FROM events W
 SKILLS=$(for f in $(find agents kb -path '*/skills/*/SKILL.md' 2>/dev/null); do
            echo "$f | $(grep -E '^(created|use_count):' "$f" | tr '\n' ' ')"; done)
 [ -z "$SKILLS" ] && SKILLS="(暂无 skill)"
+OPEN_PROPOSALS=$(python3 bin/proposals.py dump-open)
+KB_LINT=$(python3 bin/kb_lint.py 2>/dev/null || echo "(kb_lint 未运行)")
 
 SPEC=$(cat << EOF
 # 周治理 + skill_audit 合并 $WEEK
@@ -29,6 +31,10 @@ $FB
 $SKILL_HITS
 - skill 清单(created/use_count):
 $SKILLS
+- 未闭环进化提议(须逐条复检:applied 的验证效果,proposed 超两周的提醒裁决):
+$OPEN_PROPOSALS
+- KB 机器体检(死链/重复概念,机器已查,你只分析原因和给修复建议):
+$KB_LINT
 - 资产:agents/*/AGENT.md、kb/00-core/concept-index.md、kb/00-core/shared/、各项目 _index.md、traces/(抽样)
 
 ## 必须产出(单文件,五区块,可为空但须写"无")
@@ -40,11 +46,23 @@ $SKILLS
    - 90 天零 hit 的 skill → 归档提议;
    - hit 高重合的 skill → 合并提议;
    - 新 skill 准入需:同流程 ≥3 次(event 计数)+ 附 3 个 task_id,否则不得提议。
+6.【进化提议与复检】(机器解析,格式必须严格遵守)
+   - 每条新提议:
+     ### PROPOSAL: <标题>
+     target: <目标文件>
+     \`\`\`
+     <可直接应用的最终文本/diff>
+     \`\`\`
+   - 对上面注入的每条 applied 状态旧提议复检(引用 event/trace 证据):
+     ### VERIFY <P-id>: ok|fail <一句话证据>
 
 铁律:只提议不执行;所有 diff 给可直接应用的最终文本;禁止建议放宽沙箱。末尾附 envelope。
 EOF
 )
 
-echo "$SPEC" | python3 bin/enqueue.py auditor "weekly-review-$WEEK" --ttl 1800
+TID=$(echo "$SPEC" | python3 bin/enqueue.py auditor "weekly-review-$WEEK" --ttl 1800)
 python3 bin/dispatch.py
-bash bin/feishu_push.sh "🗂 周治理+skill_audit 已生成(kb/90-inbox/),周五花 15 分钟裁决:采纳的 diff 手动应用后 git commit。"
+# 提议入库+逐条推送裁决链接(手机点采纳→自动入队 apply 任务)
+RESULT=$(sqlite3 state.db "SELECT result_path FROM tasks WHERE id='$TID'")
+[ -n "$RESULT" ] && [ -f "$RESULT" ] && python3 bin/proposals.py ingest "$RESULT" --src-task "$TID"
+bash bin/feishu_push.sh "🗂 周治理 $WEEK 完成:提议已逐条推送,点链接裁决(采纳自动入队apply任务);全文 kb/90-inbox/。"

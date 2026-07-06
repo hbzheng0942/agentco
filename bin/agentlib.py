@@ -1,10 +1,27 @@
 #!/usr/bin/env python3
 """agentlib — 共享库:.env加载 / DB / 验收 / 入队(review.py、feishu_gateway.py、enqueue.py共用)"""
-import os, sqlite3
+import hashlib, hmac, os, sqlite3, time
 from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# ---- 短时效签名令牌:卡片按钮链接不再携带完整 GATEWAY_TOKEN(URL 会进 CF 日志) ----
+def sign(*fields, exp=None):
+    """对若干字段签短令牌,默认 7 天有效。格式 <exp>.<hmac16>。"""
+    secret = os.environ.get("GATEWAY_TOKEN", "")
+    exp = exp or int(time.time()) + 7*86400
+    msg = "|".join(map(str, fields)) + f"|{exp}"
+    return f"{exp}.{hmac.new(secret.encode(), msg.encode(), hashlib.sha256).hexdigest()[:16]}"
+
+def verify_sig(sig, *fields):
+    try:
+        exp, _ = sig.split(".", 1)
+        if int(exp) < time.time():
+            return False
+        return hmac.compare_digest(sig, sign(*fields, exp=int(exp)))
+    except Exception:
+        return False
 
 def load_env():
     f = ROOT/".env"
@@ -16,7 +33,8 @@ def load_env():
                 os.environ.setdefault(k.strip(), v.strip())
 
 def db():
-    c = sqlite3.connect(ROOT/"state.db"); c.row_factory = sqlite3.Row
+    c = sqlite3.connect(ROOT/"state.db", timeout=30); c.row_factory = sqlite3.Row
+    c.execute("PRAGMA busy_timeout=30000")   # 域级并发派工后多写者共存,等锁不炸
     return c
 
 def ev(c, task_id, agent, kind, detail=""):
@@ -43,9 +61,12 @@ def enqueue(agent, title, body, ttl=900, notify=1, spec_path=None,
         raise ValueError(f"difficulty 须为 {'/'.join(DIFFICULTY)},得到 {difficulty!r}")
     tier = DIFFICULTY[difficulty]
     c = db()
-    last = c.execute("SELECT MAX(CAST(substr(id,-3) AS INTEGER)) FROM tasks "
-                     "WHERE id LIKE 'T-'||strftime('%Y%m%d','now')||'-%'").fetchone()[0] or 0
-    tid = f"T-{datetime.now():%Y%m%d}-{last+1:03d}"
+    # 日期一律用本地时间:SQL 'now' 是 UTC,本地 00:00-08:00 会与 datetime.now() 差一天,
+    # LIKE 模式与生成的 id 日期不一致 → 序号从 0 重数 → 主键冲突(2026-07-07 selftest 实锤)
+    today = f"{datetime.now():%Y%m%d}"
+    last = c.execute("SELECT MAX(CAST(substr(id,-3) AS INTEGER)) FROM tasks WHERE id LIKE ?",
+                     (f"T-{today}-%",)).fetchone()[0] or 0
+    tid = f"T-{today}-{last+1:03d}"
     # 初始状态:3D→waiting_gpu(不进主循环,待本地 gpu_worker);依赖未 done→waiting_dep;否则 queued
     if agent == "executor-3d":
         status = "waiting_gpu"
@@ -109,6 +130,9 @@ def apply_review(tid, action, note=""):
         ev(c, tid, t["agent"], "rework", note)
     else:
         c.execute("UPDATE tasks SET status=?,updated_at=datetime('now') WHERE id=?", (status, tid))
+    if action == "adopt":   # 进化闭环:apply 任务被采纳 → 对应提议 adopted→applied(等 auditor 周复检)
+        c.execute("UPDATE proposals SET status='applied',updated_at=datetime('now') "
+                  "WHERE apply_task=? AND status='adopted'", (tid,))
     c.execute("INSERT INTO feedback(agent,task_id,signal,note) VALUES(?,?,?,?)",
               (t["agent"], tid, signal, note))
     c.commit()

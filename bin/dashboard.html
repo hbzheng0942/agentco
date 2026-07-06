@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agentco 控制台</title>
+<style>
+:root{--bg:#fcfcfb;--card:#f2f2f0;--ink:#1c1c1b;--ink2:#5c5c58;--line:#e2e2de;
+--good:#0ca30c;--warn:#fab219;--serious:#ec835a;--crit:#d03b3b;--accent:#4a6fb5}
+@media (prefers-color-scheme:dark){:root{--bg:#1a1a19;--card:#242422;--ink:#ececea;--ink2:#a4a49e;--line:#33332f}}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"PingFang SC",sans-serif;padding:16px;max-width:1100px;margin:auto}
+h1{font-size:17px;margin-bottom:2px} .sub{color:var(--ink2);font-size:12px;margin-bottom:14px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.tile .n{font-size:26px;font-weight:650;font-variant-numeric:tabular-nums}
+.tile .l{color:var(--ink2);font-size:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:12px;overflow-x:auto}
+.card h2{font-size:13px;color:var(--ink2);font-weight:600;margin-bottom:8px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+td,th{text-align:left;padding:4px 10px 4px 0;border-bottom:1px solid var(--line);font-size:13px;white-space:nowrap}
+th{color:var(--ink2);font-weight:500;font-size:12px}
+tr:last-child td{border-bottom:0}
+.meter{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:6px}
+.meter>i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.bar{height:6px;background:var(--line);border-radius:3px;min-width:90px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent)}
+.st{font-size:12px;font-weight:600}
+.st.good{color:var(--good)} .st.warn{color:var(--warn)} .st.serious{color:var(--serious)} .st.crit{color:var(--crit)}
+.muted{color:var(--ink2)} .grid2{display:grid;gap:12px;grid-template-columns:1fr 1fr}
+@media (max-width:760px){.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<h1>agentco 控制台</h1>
+<div class="sub" id="ts">加载中…(10s 自动刷新)</div>
+<div class="tiles" id="tiles"></div>
+<div class="card"><h2>本月模型费用(litellm 通道)</h2>
+  <div id="spendtxt"></div><div class="meter"><i id="spendbar" style="width:0"></i></div></div>
+<div class="grid2">
+  <div class="card"><h2>运行中(心跳)</h2><table id="running"></table></div>
+  <div class="card"><h2>待处理(review / blocked)</h2><table id="attention"></table></div>
+</div>
+<div class="grid2">
+  <div class="card"><h2>近 7 天各域吞吐</h2><table id="agents"></table></div>
+  <div class="card"><h2>进化提议(未闭环)</h2><table id="proposals"></table></div>
+</div>
+<div class="card"><h2>事件流(最近 25 条)</h2><table id="events"></table></div>
+<script>
+const AUTH="__AUTH__";
+const K={queued:["排队","muted"],running:["运行中","good"],review:["待验收","warn"],
+  done:["已完成","good"],blocked:["阻塞","crit"],dep_failed:["上游失败","serious"],
+  waiting_dep:["等依赖","muted"],waiting_gpu:["等GPU","muted"]};
+const KIND={done:"good",fail:"serious",block:"crit",claim:"muted",enqueue:"muted",
+  proposal:"warn",rework:"warn",dep_failed:"serious"};
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const st=(k,cls)=>`<span class="st ${cls}">${k}</span>`;
+async function load(){
+  let d;
+  try{d=await (await fetch("/api/stats?"+AUTH)).json();}catch(e){document.getElementById("ts").textContent="⚠️ 拉取失败:"+e;return}
+  document.getElementById("ts").textContent="更新于 "+d.ts+"(10s 自动刷新)· 今日完成 "+d.done24h;
+  const order=["queued","running","review","blocked","dep_failed","waiting_dep","waiting_gpu","done"];
+  document.getElementById("tiles").innerHTML=order.filter(s=>d.status[s]||["queued","running","review","blocked"].includes(s))
+    .map(s=>`<div class="tile"><div class="n">${d.status[s]||0}</div><div class="l">${st((K[s]||[s])[0],(K[s]||["","muted"])[1])}</div></div>`).join("");
+  const pct=Math.min(100,d.spend/d.budget*100);
+  document.getElementById("spendtxt").innerHTML=`<b>$${d.spend.toFixed(2)}</b> <span class="muted">/ $${d.budget} 预算(${pct.toFixed(1)}%${pct>=95?" · 🛑 接近撞顶":pct>=80?" · ⚠️ 已过80%":""})</span>`;
+  document.getElementById("spendbar").style.width=pct+"%";
+  document.getElementById("spendbar").style.background=pct>=95?"var(--crit)":pct>=80?"var(--warn)":"var(--accent)";
+  document.getElementById("running").innerHTML=d.running.length?d.running.map(r=>{
+    const p=Math.min(100,r.age/r.ttl_sec*100);
+    return `<tr><td>${esc(r.id)}</td><td>${esc(r.agent)}</td><td>${esc(r.title).slice(0,24)}</td>
+      <td><div class="bar"><i style="width:${p}%;background:${p>70?"var(--warn)":"var(--accent)"}"></i></div></td>
+      <td class="muted">${Math.floor(r.age/60)}m/${Math.floor(r.ttl_sec/60)}m</td></tr>`;}).join("")
+    :'<tr><td class="muted">空闲</td></tr>';
+  document.getElementById("attention").innerHTML=d.attention.length?d.attention.map(r=>
+    `<tr><td>${esc(r.id)}</td><td>${st((K[r.status]||[r.status])[0],(K[r.status]||["","muted"])[1])}</td><td>${esc(r.title).slice(0,30)}</td></tr>`).join("")
+    :'<tr><td class="muted">无</td></tr>';
+  const ag={};d.agents7d.forEach(r=>{(ag[r.agent]=ag[r.agent]||{})[r.kind]=r.c});
+  document.getElementById("agents").innerHTML="<tr><th>agent</th><th>done</th><th>fail</th><th>block</th></tr>"+
+    Object.entries(ag).map(([a,v])=>`<tr><td>${esc(a)}</td><td>${v.done||0}</td><td>${v.fail?st(v.fail,"serious"):0}</td><td>${v.block?st(v.block,"crit"):0}</td></tr>`).join("");
+  document.getElementById("proposals").innerHTML=d.proposals.length?d.proposals.map(p=>
+    `<tr><td>${esc(p.id)}</td><td>${st(esc(p.status),p.status==="proposed"?"warn":"good")}</td><td>${esc(p.title).slice(0,28)}</td></tr>`).join("")
+    :'<tr><td class="muted">无</td></tr>';
+  document.getElementById("events").innerHTML=d.events.map(e=>
+    `<tr><td class="muted">${esc(e.ts).slice(5,16)}</td><td>${esc(e.task_id)}</td><td>${esc(e.agent)}</td>
+     <td>${st(esc(e.kind),KIND[e.kind]||"muted")}</td><td class="muted">${esc(e.detail)}</td></tr>`).join("");
+}
+load();setInterval(load,10000);
+</script>
+</body>
+</html>

@@ -1,10 +1,10 @@
 # agentco crontab —— crontab -e 后粘贴(路径改为实际部署根;TZ建议Asia/Shanghai)
-# 派工调度:每5分钟一轮(文件锁防重入,串行消费)
+# 派工调度:每5分钟一轮(四域独立文件锁并行消费,域内串行)
 */5 * * * *  cd /opt/agentco && python3 bin/dispatch.py >> logs/cron.log 2>&1
 # 情报检索:每日 08:00(周一深扫,其余事件扫描)
 0 8 * * *    /opt/agentco/bin/intel_daily.sh >> /opt/agentco/logs/cron.log 2>&1
-# 每日 22:00:先跑 raw 缓存 GC(并入 daily cron)+ 共享组件传播检测,再出每日简报
-0 22 * * *   cd /opt/agentco && python3 bin/cache_gc.py >> logs/cron.log 2>&1; python3 bin/shared_watch.py >> logs/cron.log 2>&1; python3 bin/daily_brief.py >> logs/cron.log 2>&1
+# 每日 22:00:raw 缓存 GC + 共享组件传播检测 + inbox 滞留消化入队,再出每日简报
+0 22 * * *   cd /opt/agentco && python3 bin/cache_gc.py >> logs/cron.log 2>&1; python3 bin/shared_watch.py >> logs/cron.log 2>&1; python3 bin/inbox_digest.py >> logs/cron.log 2>&1; python3 bin/daily_brief.py >> logs/cron.log 2>&1
 # 周报+治理+skill_audit 合并单次:每周五 10:00(月度 cron 已取消,全部并入此)
 0 10 * * 5   /opt/agentco/bin/weekly_review.sh >> /opt/agentco/logs/cron.log 2>&1
 # 备份:每日 03:30

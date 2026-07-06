@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """agentco dispatcher (Wave③) — 队列在 Codex 外,Codex 只当 worker。
-cron 每 5 分钟;文件锁防重入;串行消费。
+cron 每 5 分钟;四域独立文件锁并行消费(域内串行),慢任务只阻塞本域。
 
 Wave③ 变更:
 - 工具域 4:retriever / executor-{code,data,3d} / digester / auditor(worker=profile 变体)。
@@ -13,7 +13,7 @@ Wave③ 变更:
 - 难度路由(Wave③后修订):tier=难度档(0=light 1=medium 2=heavy),派单时定;
   失败同档重试 2 次即 blocked,不再自动升档换厂商。
 """
-import fcntl, re, sqlite3, subprocess, sys
+import fcntl, multiprocessing, re, sqlite3, subprocess, sys, threading
 from datetime import datetime
 from pathlib import Path
 
@@ -149,6 +149,12 @@ def run_task(db, t):
     trace_dir = TRACES/agent/datetime.now().strftime("%Y%m%d"); trace_dir.mkdir(parents=True, exist_ok=True)
     trace = trace_dir/f"{tid}.a{t['attempts']}.jsonl"
     log(f"{tid} -> {profile} (attempt {t['attempts']+1})")
+    hb = None
+    if t["notify"]:   # 长任务心跳:ttl 70% 仍未完 → 出站告知还活着,免得静默到超时
+        hb_sec = max(60, int(t["ttl_sec"]*0.7))
+        hb = threading.Timer(hb_sec, feishu,
+            [f"⏳ {tid} {t['title']} 仍在运行(已 {hb_sec//60} 分钟,上限 {t['ttl_sec']//60} 分钟)agent={agent}"])
+        hb.daemon = True; hb.start()
     try:
         r = subprocess.run(
             ["codex", "exec", "-p", profile, "--json",
@@ -159,6 +165,9 @@ def run_task(db, t):
     except subprocess.TimeoutExpired:
         ok = False
         ev(db, tid, agent, "fail", "timeout")
+    finally:
+        if hb:
+            hb.cancel()
 
     if ok:
         final = Path(str(trace)+".final").read_text()
@@ -231,27 +240,52 @@ def propagate_block(db, t):
         log(f"{r['id']} dep_failed <- {t['id']} blocked")
     db.commit()
 
-def main():
-    lock = open(ROOT/".dispatch.lock", "w")
+# ---- 域级并发:四域各持独立锁并行消费,慢任务只阻塞本域,不再队头阻塞全队 ----
+DOMAINS = ("retriever", "executor", "digester", "auditor")
+
+def connect():
+    db = sqlite3.connect(DB, timeout=30); db.row_factory = sqlite3.Row
+    db.execute("PRAGMA busy_timeout=30000")   # WAL + busy_timeout:多域写者共存
+    return db
+
+def domain_loop(domain):
+    lock = open(ROOT/f".dispatch.{domain}.lock", "w")
     try: fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError: sys.exit(0)
-    sys.path.insert(0, str(ROOT/"bin"))   # for `import search`
-    db = sqlite3.connect(DB); db.row_factory = sqlite3.Row
-    # 僵尸回收:running 超 2×ttl → 重排
+    except BlockingIOError: return            # 该域上一轮还在跑,跳过(其余域不受影响)
+    sys.path.insert(0, str(ROOT/"bin"))       # for `import search`
+    db = connect()
+    like = domain + "-%"
+    # 僵尸回收(本域):running 超 2×ttl → 重排
     for s in db.execute("""SELECT id,agent FROM tasks WHERE status='running'
-        AND (strftime('%s','now')-strftime('%s',updated_at)) > 2*ttl_sec""").fetchall():
+        AND (agent=? OR agent LIKE ?)
+        AND (strftime('%s','now')-strftime('%s',updated_at)) > 2*ttl_sec""", (domain, like)).fetchall():
         db.execute("UPDATE tasks SET status='queued',attempts=attempts+1,updated_at=datetime('now') WHERE id=?", (s["id"],))
         ev(db, s["id"], s["agent"], "fail", "stale-running recovered")
     while True:
-        # 只取 queued 且依赖已满足(NULL 或指向的任务 done);按优先级、创建时间
+        # 只取本域 queued 且依赖已满足(NULL 或指向的任务 done);按优先级、创建时间
         row = db.execute("""SELECT * FROM tasks WHERE status='queued'
+            AND (agent=? OR agent LIKE ?)
             AND (depends_on IS NULL OR depends_on='' OR
                  depends_on IN (SELECT id FROM tasks WHERE status='done'))
-            ORDER BY priority, created_at LIMIT 1""").fetchone()
+            ORDER BY priority, created_at LIMIT 1""", (domain, like)).fetchone()
         if not row: break
         db.execute("UPDATE tasks SET status='running',updated_at=datetime('now') WHERE id=?", (row["id"],)); db.commit()
-        ev(db, row["id"], row["agent"], "claim")
+        ev(db, row["id"], row["agent"], "claim", f"domain={domain}")
         run_task(db, dict(row))
+
+def _ready_count(db):
+    return db.execute("""SELECT count(*) FROM tasks WHERE status='queued'
+        AND (depends_on IS NULL OR depends_on='' OR
+             depends_on IN (SELECT id FROM tasks WHERE status='done'))""").fetchone()[0]
+
+def main():
+    # 最多 3 轮:上游 done 触发的跨域下游任务(dep_triggered)同一次 cron 内接力消费,不等下轮
+    for _ in range(3):
+        procs = [multiprocessing.Process(target=domain_loop, args=(d,)) for d in DOMAINS]
+        for p in procs: p.start()
+        for p in procs: p.join()
+        if _ready_count(connect()) == 0:
+            break
 
 if __name__ == "__main__":
     main()

@@ -5,7 +5,7 @@ import base64, hashlib, hmac, json, os, sys, time, urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from agentlib import load_env
+from agentlib import load_env, sign
 
 load_env()
 tid, title = sys.argv[1], sys.argv[2]
@@ -20,8 +20,9 @@ def payload():
     if not base or not tok:   # 降级:纯文本
         return {"msg_type": "text", "content":
                 {"text": f"🔎 待验收 {tid} {title}\n{preview}\n(服务器: bin/review.py {tid} adopt|rework|reject)"}}
+    # 短时效签名链接:完整 GATEWAY_TOKEN 不进 URL(CF 会记 query log)
     btn = lambda lbl, act, typ: {"tag": "button", "text": {"tag": "plain_text", "content": lbl},
-        "type": typ, "url": f"{base}/review?tid={tid}&action={act}&token={tok}"}
+        "type": typ, "url": f"{base}/review?tid={tid}&action={act}&s={sign(tid, act)}"}
     return {"msg_type": "interactive", "card": {
         "header": {"title": {"tag": "plain_text", "content": f"🔎 待验收 {tid} · {title}"}, "template": "blue"},
         "elements": [

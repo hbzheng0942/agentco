@@ -56,6 +56,9 @@ fi
 ck "feishu push" "bin/feishu_push.sh 'agentco verify ping'"
 ck "gateway /health" "curl -sf -m 5 http://\${GATEWAY_BIND:-127.0.0.1:9000}/health"
 ck "gateway /enqueue 拒绝无 token" "[ \$(curl -s -o /dev/null -w '%{http_code}' -m5 \"http://\${GATEWAY_BIND:-127.0.0.1:9000}/enqueue?agent=retriever&title=x\") = 403 ]"
+ck "gateway /api/stats 鉴权+可用" "[ \$(curl -s -o /dev/null -w '%{http_code}' -m5 \"http://\${GATEWAY_BIND:-127.0.0.1:9000}/api/stats\") = 403 ] && curl -sf -m5 \"http://\${GATEWAY_BIND:-127.0.0.1:9000}/api/stats?token=\$GATEWAY_TOKEN\" | grep -q '\"status\"'"
+ck "kb_lint 可运行(死链/冗余体检)" "python3 bin/kb_lint.py"
+ck "proposals 表就位(进化闭环)" "sqlite3 state.db 'SELECT count(*) FROM proposals'"
 
 echo "---- pass=$pass fail=$fail skip=$skip ----"
 [ $fail -eq 0 ]

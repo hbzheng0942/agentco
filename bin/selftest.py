@@ -192,8 +192,61 @@ def t_brief():
     shutil.rmtree(r, ignore_errors=True)
 
 
+def t_sign():
+    import agentlib, time as _t
+    os.environ["GATEWAY_TOKEN"] = "test-secret"
+    s = agentlib.sign("T-1", "adopt")
+    check("sign: 正签验证通过", agentlib.verify_sig(s, "T-1", "adopt"))
+    check("sign: 字段被篡改拒绝", not agentlib.verify_sig(s, "T-1", "reject"))
+    expired = agentlib.sign("T-1", "adopt", exp=int(_t.time())-10)
+    check("sign: 过期令牌拒绝", not agentlib.verify_sig(expired, "T-1", "adopt"))
+
+
+def t_proposals():
+    r = fresh_root(); (r/"handoff").exists()
+    import agentlib, proposals
+    agentlib.ROOT = r
+    proposals.push = lambda *a: None
+    doc = ("周报...\n### PROPOSAL: 收紧 retriever turn 上限\ntarget: agents/retriever/AGENT.md\n"
+           "```\nturn 上限 5 → 4\n```\n中间叙述\n### VERIFY P-2026W01-01: ok event#12 显示已生效\n")
+    f = r/"weekly.md"; f.write_text(doc)
+    c = agentlib.db()
+    c.execute("INSERT INTO proposals(id,week,title,status,apply_task) VALUES('P-2026W01-01','2026W01','旧提议','applied','T-old')")
+    c.commit()
+    proposals.ingest(str(f), "T-wr")
+    row = c.execute("SELECT * FROM proposals WHERE title LIKE '收紧%'").fetchone()
+    check("proposals: PROPOSAL 区块解析入库(title/target/diff)",
+          row and row["target"] == "agents/retriever/AGENT.md" and "turn 上限" in row["diff"])
+    check("proposals: VERIFY ok → applied 转 verified",
+          c.execute("SELECT status FROM proposals WHERE id='P-2026W01-01'").fetchone()[0] == "verified")
+    proposals.set_status(row["id"], "adopt")
+    p2 = c.execute("SELECT status,apply_task FROM proposals WHERE id=?", (row["id"],)).fetchone()
+    check("proposals: adopt → 自动入队 apply 任务", p2["status"] == "adopted" and (p2["apply_task"] or "").startswith("T-"))
+    agentlib.apply_review(p2["apply_task"], "adopt")   # apply 任务尚在 queued,不可验收 → 状态不变
+    c2 = agentlib.db()
+    c2.execute("UPDATE tasks SET status='review' WHERE id=?", (p2["apply_task"],)); c2.commit()
+    agentlib.apply_review(p2["apply_task"], "adopt")
+    check("proposals: apply 任务人工采纳 → applied(等周复检)",
+          c2.execute("SELECT status FROM proposals WHERE id=?", (row["id"],)).fetchone()[0] == "applied")
+    shutil.rmtree(r, ignore_errors=True)
+
+
+def t_kb_lint():
+    r = Path(tempfile.mkdtemp(prefix="agentco-kblint-"))
+    import kb_lint
+    kb_lint.ROOT = r; kb_lint.KB = r/"kb"
+    (r/"kb/00-core").mkdir(parents=True); (r/"kb/30-projects/p1").mkdir(parents=True)
+    (r/"kb/00-core/concept-index.md").write_text("- [关节](joints.md) | 权威\n- [装配](asm.md) | 权威\n")
+    (r/"kb/00-core/joints.md").write_text("ok 见 [缺](nope.md)")
+    (r/"kb/30-projects/p1/_index.md").write_text("- [关节](x.md) | 项目内\n")
+    issues = kb_lint.lint()
+    check("kb_lint: 死链检出", any("nope.md" in i for i in issues))
+    check("kb_lint: 全局/项目概念冗余检出", any("关节" in i and "冗余" in i for i in issues))
+    shutil.rmtree(r, ignore_errors=True)
+
+
 if __name__ == "__main__":
-    for fn in (t_schema, t_search, t_dispatch, t_cache_gc, t_shared, t_brief):
+    for fn in (t_schema, t_search, t_dispatch, t_cache_gc, t_shared, t_brief, t_sign, t_proposals, t_kb_lint):
         try:
             fn()
         except Exception as e:

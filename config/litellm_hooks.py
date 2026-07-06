@@ -9,8 +9,11 @@
   3. 补齐孤立 tool_calls:assistant.tool_calls 的每个 id 必须紧跟对应 tool 消息,否则 400
      "tool_calls must be followed by tool messages"。变换偶发丢配对,这里为缺失 id 合成占位 tool 回复。
 
-外加一件(log 钩子):router 发生 fallback 换模型(如 qwen-max→ds-chat)或连兜底全挂时,
-飞书出站通知为何失败、切成了什么(宪法要求;10 分钟冷却防刷屏)。
+外加两件(log 钩子):
+  - router 发生 fallback 换模型(如 qwen-max→ds-chat)或连兜底全挂时,飞书出站通知
+    为何失败、切成了什么(宪法要求;10 分钟冷却防刷屏)。
+  - 月度花费记账(logs/spend-YYYYMM.json),撞 LITELLM_BUDGET_USD(缺省200)的 80%/95% 各预警一次
+    ——litellm max_budget 撞顶是直接全链拒绝,不能等到那时才知道。
 """
 import json
 import os
@@ -182,6 +185,30 @@ def _maybe_notify_fallback(kwargs, final_error=None):
     _feishu(f"{head}\n原因:{why}")
 
 
+# ---- 月度花费记账 + 预算预警 ----
+_SPEND_DIR = os.path.join(os.path.dirname(__file__), "..", "logs")
+_BUDGET = float(os.environ.get("LITELLM_BUDGET_USD", "200"))
+_WARN_AT = (0.8, 0.95)
+
+
+def _record_spend(kwargs):
+    cost = kwargs.get("response_cost") or 0
+    if not cost:
+        return
+    path = os.path.join(_SPEND_DIR, f"spend-{datetime.now():%Y%m}.json")
+    try:
+        st = json.load(open(path)) if os.path.exists(path) else {"spend": 0.0, "warned": []}
+        st["spend"] += float(cost)
+        for th in _WARN_AT:
+            if st["spend"] >= _BUDGET*th and th not in st["warned"]:
+                st["warned"].append(th)
+                _feishu(f"💸 litellm 本月花费 ${st['spend']:.2f},已达预算 ${_BUDGET:.0f} 的 {int(th*100)}%"
+                        f"{';撞顶后所有模型调用会被直接拒绝' if th >= 0.95 else ''}")
+        json.dump(st, open(path, "w"))
+    except Exception as e:
+        _dbg(f"spend record failed: {e}")
+
+
 class ToolSanitizer(CustomLogger):
     async def async_pre_call_hook(self, user_api_key_dict, cache, data, call_type):
         _strip_tools(data)
@@ -207,6 +234,7 @@ class ToolSanitizer(CustomLogger):
     async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
         # 成功但走过 fallback(previous_models 非空)→ 出站说明
         _maybe_notify_fallback(kwargs)
+        _record_spend(kwargs)
 
     async def async_log_failure_event(self, kwargs, response_obj, start_time, end_time):
         # 连兜底也失败 → 出站说明(dispatcher 只报任务 blocked,不报模型层原因)

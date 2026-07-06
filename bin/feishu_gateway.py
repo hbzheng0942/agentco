@@ -12,7 +12,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from agentlib import ROOT, load_env, apply_review, enqueue
+from agentlib import ROOT, db, load_env, apply_review, enqueue, verify_sig
 
 load_env()
 TOKEN  = os.environ.get("GATEWAY_TOKEN", "")
@@ -32,8 +32,39 @@ def audit(msg):
 def push(text):
     subprocess.run([str(ROOT/"bin/feishu_push.sh"), text], check=False)
 
+def _spend():
+    import glob
+    f = sorted(glob.glob(str(ROOT/"logs/spend-*.json")))
+    try:
+        return json.loads(Path(f[-1]).read_text())["spend"] if f else 0.0
+    except Exception:
+        return 0.0
+
+def stats():
+    c = db()
+    q = lambda sql, *a: [dict(r) for r in c.execute(sql, a).fetchall()]
+    return {
+        "ts": datetime.now().isoformat(timespec="seconds"),
+        "status": {r["status"]: r["c"] for r in c.execute("SELECT status,count(*) c FROM tasks GROUP BY status")},
+        "running": q("SELECT id,agent,title,ttl_sec,"
+                     "(strftime('%s','now')-strftime('%s',updated_at)) age FROM tasks WHERE status='running'"),
+        "attention": q("SELECT id,agent,status,title FROM tasks WHERE status IN ('blocked','dep_failed','review') "
+                       "ORDER BY updated_at DESC LIMIT 10"),
+        "agents7d": q("SELECT agent,kind,count(*) c FROM events WHERE ts>datetime('now','-7 day') "
+                      "AND kind IN ('done','fail','block') GROUP BY agent,kind"),
+        "done24h": c.execute("SELECT count(*) FROM events WHERE kind='done' AND ts>datetime('now','-1 day')").fetchone()[0],
+        "events": q("SELECT task_id,agent,kind,substr(detail,1,60) detail,ts FROM events ORDER BY id DESC LIMIT 25"),
+        "proposals": q("SELECT id,status,title FROM proposals WHERE status IN ('proposed','adopted','applied') "
+                       "ORDER BY ts DESC LIMIT 10"),
+        "spend": round(_spend(), 2),
+        "budget": float(os.environ.get("LITELLM_BUDGET_USD", "200")),
+    }
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
+
+    def _dash_auth(self, q):
+        return (q.get("s") and verify_sig(q["s"], "dashboard")) or (TOKEN and q.get("token") == TOKEN)
 
     def _send(self, code, body, ctype="text/html; charset=utf-8"):
         b = body.encode()
@@ -49,11 +80,34 @@ class H(BaseHTTPRequestHandler):
         if u.path == "/health":
             return self._send(200, "ok", "text/plain")
         if u.path == "/review":
-            if not TOKEN or q.get("token") != TOKEN:
+            # 短时效签名链接(卡片按钮,不带完整token防CF日志泄露);legacy 完整token仍兼容
+            authed = (q.get("s") and verify_sig(q["s"], q.get("tid", ""), q.get("action", ""))) or \
+                     (TOKEN and q.get("token") == TOKEN)
+            if not authed:
                 return self._send(403, "forbidden")
             ok, msg = apply_review(q.get("tid", ""), q.get("action", ""), q.get("note", ""))
             return self._send(200 if ok else 400,
                 f"<html><body style='font-size:22px;padding:40px'>{'✅' if ok else '⚠️'} {msg}</body></html>")
+        if u.path == "/proposal":   # 进化提议裁决(签名链接;adopt 自动入队 apply 任务)
+            pid, action = q.get("id", ""), q.get("action", "")
+            if not (q.get("s") and verify_sig(q["s"], pid, action)) and (not TOKEN or q.get("token") != TOKEN):
+                return self._send(403, "forbidden")
+            r = subprocess.run([sys.executable, str(ROOT/"bin/proposals.py"), "set", pid, action],
+                               capture_output=True, text=True)
+            msg = (r.stdout or r.stderr).strip()
+            push(f"🧬 {msg}")
+            return self._send(200 if r.returncode == 0 else 400,
+                f"<html><body style='font-size:22px;padding:40px'>{'✅' if r.returncode == 0 else '⚠️'} {msg}</body></html>")
+        if u.path == "/api/stats":
+            if not self._dash_auth(q):
+                return self._send(403, "{}", "application/json")
+            return self._send(200, json.dumps(stats(), ensure_ascii=False), "application/json")
+        if u.path == "/dashboard":
+            if not self._dash_auth(q):
+                return self._send(403, "forbidden")
+            page = (ROOT/"bin/dashboard.html").read_text().replace("__AUTH__", urllib.parse.urlencode(
+                {k: q[k] for k in ("s", "token") if k in q}))
+            return self._send(200, page)
         if u.path == "/enqueue":   # 日报/TODO 卡片按钮点击直接入队(GATEWAY_TOKEN 鉴权)
             if not TOKEN or q.get("token") != TOKEN:
                 return self._send(403, "forbidden")
