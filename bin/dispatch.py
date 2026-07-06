@@ -15,6 +15,10 @@ import fcntl, re, sqlite3, subprocess, sys
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from agentlib import load_env
+load_env()  # cron 环境无 .env 变量;codex/feishu_card 子进程靠继承 os.environ 拿 LITELLM_MASTER_KEY 等
+
 ROOT = Path(__file__).resolve().parent.parent
 DB, TRACES, LOG = ROOT/"state.db", ROOT/"traces", ROOT/"logs/dispatch.log"
 MAX_ATTEMPTS_PER_TIER, MAX_TIER = 2, 1

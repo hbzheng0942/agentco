@@ -2,7 +2,7 @@
 # verify.sh — Wave③ 验收门探针,全绿才算部署完成。
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
-source .env 2>/dev/null || true
+set -a; source .env 2>/dev/null || true; set +a  # set -a:.env无export前缀,不加则codex等子进程拿不到LITELLM_MASTER_KEY
 pass=0; fail=0; skip=0
 ck(){ if eval "$2" >/dev/null 2>&1; then echo "✅ $1"; pass=$((pass+1)); else echo "❌ $1"; fail=$((fail+1)); fi }
 sk(){ echo "⏭  SKIP $1"; skip=$((skip+1)); }

@@ -14,7 +14,8 @@ import subprocess, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from agentlib import ROOT, db
+from agentlib import ROOT, db, load_env
+load_env()  # cron 环境:feishu_card.py 子进程需继承 FEISHU_WEBHOOK/GATEWAY_TOKEN
 
 WIN = "-1 day"
 
