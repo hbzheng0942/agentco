@@ -46,6 +46,15 @@ def log(msg):
 def feishu(text):
     subprocess.run([str(ROOT/"bin/feishu_push.sh"), text], check=False)
 
+def feishu_archive(path, name):
+    """md 产物存档到飞书云文档 agentco 目录,返回链接;未配凭据/失败返回 None(降级本地路径)。"""
+    try:
+        r = subprocess.run([sys.executable, str(ROOT/"bin/feishu_archive.py"), str(path), name],
+                           capture_output=True, text=True, timeout=30)
+        return r.stdout.strip() if r.returncode == 0 and r.stdout.strip().startswith("http") else None
+    except Exception:
+        return None
+
 def ev(db, task_id, agent, kind, detail=""):
     db.execute("INSERT INTO events(task_id,agent,kind,detail) VALUES(?,?,?,?)",
                (task_id, agent, kind, detail)); db.commit()
@@ -61,6 +70,45 @@ def record_skill_hits(db, tid, agent, spec):
             m = re.search(r"^use_count:\s*(\d+)\s*$", txt, re.M)
             if m:
                 f.write_text(txt[:m.start(1)] + str(int(m.group(1)) + 1) + txt[m.end(1):])
+
+# ---- envelope 规范化:溯源字段(source_urls/content_hash)信模型,身份字段(model/tier/…)信 dispatcher ----
+# 背景:envelope 由模型手写时格式漂移(yaml 围栏包裹/tier 错/model 自报不可信,T-20260706-003 审计实锤)。
+_ENV_LINE = re.compile(r"^(?:[\w_]+:.*|-\s.*|---|```(?:yaml)?|#\s*envelope.*|\s*)$")
+
+def split_envelope(final):
+    """从产出末尾剥离模型手写 envelope(容忍 ``` 围栏/---/# envelope 标头),
+    返回 (正文, source_urls行, content_hash)。无 envelope 返回 (原文, None, None)。"""
+    lines = final.rstrip().splitlines()
+    i = len(lines)
+    while i > 0 and _ENV_LINE.match(lines[i-1]):
+        i -= 1
+    tail = "\n".join(lines[i:])
+    if "task_id:" not in tail and "content_hash:" not in tail:
+        return final.rstrip(), None, None
+    m_urls = re.search(r"^source_urls:\s*(.+)$", tail, re.M)
+    urls = m_urls.group(1).strip() if m_urls else None
+    if urls is None and re.search(r"^source_urls:\s*$", tail, re.M):  # yaml 多行列表
+        block = re.search(r"^source_urls:\s*\n((?:\s*-\s.*\n?)+)", tail, re.M)
+        if block:
+            urls = "[" + ", ".join(x.strip("- ").strip() for x in block.group(1).splitlines()) + "]"
+    m_hash = re.search(r"^content_hash:\s*(\S+)", tail, re.M)
+    return "\n".join(lines[:i]).rstrip(), urls, (m_hash.group(1) if m_hash else None)
+
+def profile_model(profile):
+    f = Path.home()/".codex"/f"{profile}.config.toml"
+    if f.exists():
+        m = re.search(r'^model\s*=\s*"([^"]+)"', f.read_text(), re.M)
+        if m:
+            return m.group(1)
+    return "gpt-plus-default"   # -hi 档不写 model = 用 ChatGPT 登录账号默认模型
+
+def canonical_envelope(t, profile, urls, chash, artifacts):
+    return ("---\n"
+            f"task_id: {t['id']}\nagent: {t['agent']}\nmodel: {profile_model(profile)}\n"
+            f"tier: {t['tier']}\nproject: {t['project'] or 'default'}\n"
+            f"depends_on: {t['depends_on'] or 'null'}\n"
+            f"source_urls: {urls if urls else '[]'}\ncontent_hash: {chash or ''}\n"
+            f"artifacts: [{', '.join(artifacts)}]\n---")
 
 # ---- retriever 预处理:跑 search.py,把 raw 路径注入上下文 ----
 def search_preprocess(db, t, spec):
@@ -114,12 +162,22 @@ def run_task(db, t):
 
     if ok:
         final = Path(str(trace)+".final").read_text()
-        out = ROOT/"handoff"/f"{tid}.result.md"
-        out.write_text(f"# {tid} result ({agent}/{profile})\n\n{final}\n")
-        if agent in INBOX_AGENTS:   # retriever/digester/auditor 直接闭环落 inbox
+        body, urls, chash = split_envelope(final)
+        if urls is None and chash is None:
+            ev(db, tid, agent, "envelope_missing", profile)   # 模型没写 envelope,进周治理统计
+        proj = t["project"] or "default"
+        out = ROOT/"handoff"/proj/f"{tid}.result.md"          # 与 spec 同项目目录,禁扁平落 handoff/
+        out.parent.mkdir(parents=True, exist_ok=True)
+        artifacts = [str(out.relative_to(ROOT))]
+        inbox = None
+        if agent in INBOX_AGENTS:
             inbox = ROOT/"kb/90-inbox"/f"{tid}-{agent}.md"
-            inbox.write_text(f"---\nsource: {agent}\ntask: {tid}\nproject: {t['project']}\n"
-                             f"date: {datetime.now():%Y-%m-%d}\nstatus: raw\n---\n\n{final}\n")
+            artifacts.append(str(inbox.relative_to(ROOT)))
+        envelope = canonical_envelope(t, profile, urls, chash, artifacts)
+        out.write_text(f"# {tid} result ({agent}/{profile})\n\n{body}\n\n{envelope}\n")
+        if inbox is not None:       # retriever/digester/auditor 直接闭环落 inbox
+            inbox.write_text(f"---\nsource: {agent}\ntask: {tid}\nproject: {proj}\n"
+                             f"date: {datetime.now():%Y-%m-%d}\nstatus: raw\n---\n\n{body}\n\n{envelope}\n")
             new_status = "done"
         else:                       # executor → review(机器验收)
             new_status = "review"
@@ -129,11 +187,19 @@ def run_task(db, t):
         if new_status == "done":
             trigger_dependents(db, tid)
         if t["notify"]:
+            paths = " ; ".join(artifacts)
             if new_status == "review":
                 subprocess.run([sys.executable, str(ROOT/"bin/feishu_card.py"),
-                                tid, t["title"], final[:600]], check=False)
+                                tid, t["title"], f"📄 {paths}\n\n{body[:600]}"], check=False)
             else:
-                feishu(f"✅ {tid} {t['title']}\nagent={agent} difficulty={DIFF.get(tier, tier)}\n---\n{final[:800]}")
+                head = f"✅ {tid} {t['title']}\nagent={agent} difficulty={DIFF.get(tier, tier)}\n📄 {paths}"
+                link = feishu_archive(inbox or out, f"{tid}-{agent}.md")
+                if link:            # md 产物已存档飞书:发链接+摘要,不刷全文
+                    feishu(f"{head}\n☁️ {link}\n---\n{body[:300]}")
+                elif len(body) <= 800:   # 无存档通道:短产出退全文
+                    feishu(f"{head}\n---\n{body}")
+                else:
+                    feishu(f"{head}\n(超800字,全文见上述路径)\n---\n{body[:800]}")
     else:
         attempts = t["attempts"]+1
         # 失败不换厂商:难度是入队时已知的任务属性,失败是给人看的信号(裁决后可改难度重派)

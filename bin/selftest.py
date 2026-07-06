@@ -103,6 +103,17 @@ def t_dispatch():
     e = agentlib.enqueue("executor-code", "E", "x", project="assembly", depends_on=d)
     dispatch.propagate_block(db, {"id": d})   # db 已 row_factory=Row(生产由 main() 保证)
     check("dispatch: D blocked → E dep_failed(不静默挂起)", st(e) == "dep_failed")
+    # envelope 规范化:剥围栏手写 envelope,溯源字段继承,身份字段由 dispatcher 注入
+    raw_final = ("分析正文...\n\n```yaml\ntask_id: T-x\nagent: auditor\nmodel: claude-sonnet-4\n"
+                 "tier: 2\nstatus: ok\nsource_urls: [https://a.com]\ncontent_hash: abc123\n```")
+    body2, urls2, ch2 = dispatch.split_envelope(raw_final)
+    check("envelope: 剥离围栏手写块+继承溯源", body2 == "分析正文..." and urls2 == "[https://a.com]" and ch2 == "abc123")
+    envt = {"id": "T-y", "agent": "auditor", "tier": 0, "project": "assembly", "depends_on": None}
+    env = dispatch.canonical_envelope(envt, "auditor", urls2, ch2, ["handoff/assembly/T-y.result.md"])
+    check("envelope: dispatcher 注入身份字段(model 非自报/tier 正确/无契约外字段)",
+          "model: qwen-max" in env and "tier: 0" in env and "status:" not in env and "content_hash: abc123" in env)
+    b3, u3, c3 = dispatch.split_envelope("纯正文无envelope")
+    check("envelope: 无手写块时原文保留", b3 == "纯正文无envelope" and u3 is None and c3 is None)
     # spec 丢失 → blocked(单任务坏文件不许崩掉调度器主循环)
     f = agentlib.enqueue("retriever", "F", "x", project="assembly")
     frow = dict(db.execute("SELECT * FROM tasks WHERE id=?", (f,)).fetchone())

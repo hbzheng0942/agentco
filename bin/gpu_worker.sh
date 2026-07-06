@@ -15,6 +15,7 @@ TID=$(SQL "SELECT id FROM tasks WHERE status='waiting_gpu' ORDER BY priority,cre
 [ -z "$TID" ] && { echo "无 waiting_gpu 任务"; exit 0; }
 echo "认领 $TID"
 SPEC=$(SQL "SELECT spec_path FROM tasks WHERE id='$TID'")
+PROJ=$(SQL "SELECT COALESCE(NULLIF(project,''),'default') FROM tasks WHERE id='$TID'")
 SQL "UPDATE tasks SET status='running',updated_at=datetime('now') WHERE id='$TID'"
 SQL "INSERT INTO events(task_id,agent,kind,detail) VALUES('$TID','executor-3d','claim','gpu_worker')"
 
@@ -24,8 +25,9 @@ scp "$AGENTCO_SSH:$REMOTE_ROOT/$SPEC" "$WORK/spec.md" || { echo "scp spec 失败
 # —— 本地 Blender 执行(占位:按 spec 组织实际渲染/建模命令)——
 OUT="$WORK/${TID}.result.md"
 if command -v blender >/dev/null && bash "$WORK/run_blender.sh" 2>"$WORK/err.log"; then
-  scp "$OUT" "$AGENTCO_SSH:$REMOTE_ROOT/handoff/${TID}.result.md"
-  SQL "UPDATE tasks SET status='review',result_path='handoff/${TID}.result.md',updated_at=datetime('now') WHERE id='$TID'"
+  ssh "$AGENTCO_SSH" "mkdir -p '$REMOTE_ROOT/handoff/$PROJ'"
+  scp "$OUT" "$AGENTCO_SSH:$REMOTE_ROOT/handoff/$PROJ/${TID}.result.md"
+  SQL "UPDATE tasks SET status='review',result_path='handoff/$PROJ/${TID}.result.md',updated_at=datetime('now') WHERE id='$TID'"
   SQL "INSERT INTO events(task_id,agent,kind,detail) VALUES('$TID','executor-3d','done','gpu_worker')"
   echo "$TID → review"
 else
