@@ -103,6 +103,13 @@ def t_dispatch():
     e = agentlib.enqueue("executor-code", "E", "x", project="assembly", depends_on=d)
     dispatch.propagate_block(db, {"id": d})   # db 已 row_factory=Row(生产由 main() 保证)
     check("dispatch: D blocked → E dep_failed(不静默挂起)", st(e) == "dep_failed")
+    # spec 丢失 → blocked(单任务坏文件不许崩掉调度器主循环)
+    f = agentlib.enqueue("retriever", "F", "x", project="assembly")
+    frow = dict(db.execute("SELECT * FROM tasks WHERE id=?", (f,)).fetchone())
+    (r/frow["spec_path"]).unlink()
+    dispatch.feishu = lambda *a: None   # 测试不真推飞书
+    dispatch.run_task(db, frow)
+    check("dispatch: spec 丢失 → blocked 不崩", st(f) == "blocked")
     sk = r/"agents/digester/skills/scribe"; sk.mkdir(parents=True)
     (sk/"SKILL.md").write_text("---\nuse_count: 0\n---\n")
     dispatch.record_skill_hits(db, "T-x", "digester", "用 agents/digester/skills/scribe/SKILL.md")
@@ -115,7 +122,7 @@ def t_dispatch():
     h = agentlib.enqueue("retriever", "H", "x", project="assembly", difficulty="heavy")
     check("routing: retriever heavy → kimi-long(tier=2)", tier(h) == 2
           and dispatch.PROFILE[("retriever", 2)] == "retriever-long")
-    check("routing: auditor 全档异厂商(恒 ds-reasoner,无 GPT 档)",
+    check("routing: auditor 全档异厂商(恒 qwen-max,无 GPT 档)",
           len({dispatch.PROFILE[("auditor", i)] for i in (0, 1, 2)}) == 1)
     check("routing: 失败自动升档已移除", not hasattr(dispatch, "MAX_TIER"))
     shutil.rmtree(r, ignore_errors=True)

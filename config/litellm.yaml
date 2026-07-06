@@ -13,6 +13,12 @@ model_list:
       model: deepseek/deepseek-v4-pro  # 旧名 deepseek-reasoner 2026-07-24 弃用
       api_key: os.environ/DEEPSEEK_API_KEY
 
+  - model_name: qwen-max               # auditor 主力:qwen3.7-max(DashScope OpenAI兼容,原生支持Responses;贵,只给审计)
+    litellm_params:
+      model: openai/qwen3.7-max
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api_key: os.environ/DASHSCOPE_API_KEY
+
   - model_name: kimi-long              # 长上下文:Intel抓取/论文初筛
     litellm_params:
       model: openai/kimi-k2.6          # Kimi OpenAI-compatible endpoint
@@ -23,6 +29,7 @@ router_settings:
   fallbacks:
     - kimi-long: ["ds-chat"]           # Kimi挂了降级DeepSeek,保cron不断
     - ds-chat: ["kimi-long"]           # 反向兜底:DeepSeek挂了整链不至于全断
+    - qwen-max: ["ds-chat"]            # auditor兜底:qwen挂了降ds-chat(hook出站通知,见litellm_hooks)
   num_retries: 2
   timeout: 120
 

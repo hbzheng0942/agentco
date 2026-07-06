@@ -21,8 +21,9 @@
 - **中等及以上难度的 executor 工作走 GPT**(ChatGPT Plus 账号,不过 litellm);light 杂活走 DeepSeek 省配额。
   executor 缺省 difficulty=medium,其余域缺省 light。
 - 路由表(dispatch.py PROFILE 为准):executor light→ds-chat,medium/heavy→GPT;
-  retriever light/medium→ds-reasoner,heavy→kimi-long(超长 raw);digester light/medium→kimi-long,heavy→GPT;
-  auditor 恒 ds-reasoner——**刻意不给 GPT**:executor 产出走 GPT,审查须异厂商("agent 不得自评"的厂商级延伸)。
+  retriever light/medium→ds-chat,heavy→kimi-long(超长 raw);digester light/medium→kimi-long,heavy→GPT;
+  auditor 恒 qwen-max(qwen3.7-max@DashScope)——**刻意不给 GPT**:executor 产出走 GPT,审查须异厂商("agent 不得自评"的厂商级延伸);
+  qwen 故障时 litellm 兜底降 ds-chat,**任何故障切换模型都必须出站飞书通知**(为何失败、切成了什么,litellm_hooks 负责)。
 - **多模态仅 GPT 通道可用**(ds/kimi 均纯文本 endpoint):带图任务必须标 medium 及以上。
 - GPT 走 Plus 订阅配额,heavy 靠少而精自律,dispatch 不做配额计数。
 

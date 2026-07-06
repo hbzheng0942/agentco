@@ -16,6 +16,21 @@ fi
 LITELLM_BIN="$ROOT/.venv/bin/litellm"
 [ -x "$LITELLM_BIN" ] || LITELLM_BIN="$(command -v litellm)"
 
+# 0b. codex 沙箱前提:Ubuntu24 kernel.apparmor_restrict_unprivileged_userns=1 会拦 bwrap 的
+# userns(症状:worker 内 shell 全灭 "bwrap: loopback: Failed RTM_NEWADDR",agent 读不到文件
+# 只能凭先验编造)。定向放行 bwrap,其余程序仍受限。
+if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ] && [ ! -f /etc/apparmor.d/bwrap ]; then
+  sudo tee /etc/apparmor.d/bwrap > /dev/null << 'EOF'
+abi <abi/4.0>,
+include <tunables/global>
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
+EOF
+  sudo apparmor_parser -r /etc/apparmor.d/bwrap
+  echo "apparmor: bwrap userns 已放行"
+fi
+
 # 1. env
 [ -f "$ROOT/.env" ] || { cp "$ROOT/.env.example" "$ROOT/.env"; echo "!! 编辑 .env 填key后重跑"; exit 1; }
 set -a; source "$ROOT/.env"; set +a

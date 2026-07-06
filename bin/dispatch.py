@@ -88,7 +88,13 @@ def run_task(db, t):
         ev(db, tid, agent, "block", f"no profile for ({agent},{tier})")
         db.execute("UPDATE tasks SET status='blocked',updated_at=datetime('now') WHERE id=?", (tid,)); db.commit()
         propagate_block(db, t); return
-    spec = (ROOT/t["spec_path"]).read_text()
+    spec_file = ROOT/t["spec_path"]
+    if not spec_file.exists():   # spec 丢失(如项目目录被清理):blocked 进日报,绝不让单任务崩掉整个调度器
+        ev(db, tid, agent, "block", f"spec missing: {t['spec_path']}")
+        db.execute("UPDATE tasks SET status='blocked',updated_at=datetime('now') WHERE id=?", (tid,)); db.commit()
+        feishu(f"🛑 {tid} {t['title']} BLOCKED:spec 文件丢失 {t['spec_path']},需人工裁决")
+        propagate_block(db, t); return
+    spec = spec_file.read_text()
     record_skill_hits(db, tid, agent, spec)
     if agent == "retriever":
         spec = search_preprocess(db, t, spec)
@@ -98,9 +104,9 @@ def run_task(db, t):
     try:
         r = subprocess.run(
             ["codex", "exec", "-p", profile, "--json",
-             "--cd", str(ROOT), "--output-last-message", str(trace)+".final", spec],
+             "--cd", str(ROOT), "--output-last-message", str(trace)+".final", "--", spec],
             capture_output=True, text=True, timeout=t["ttl_sec"])
-        trace.write_text(r.stdout)
+        trace.write_text(r.stdout + (f"\n\n# stderr\n{r.stderr}" if r.stderr else ""))
         ok = r.returncode == 0 and Path(str(trace)+".final").exists()
     except subprocess.TimeoutExpired:
         ok = False

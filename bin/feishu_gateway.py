@@ -6,6 +6,7 @@
 安全:绑127.0.0.1,经Cloudflare Tunnel暴露;/review 需 GATEWAY_TOKEN;/feishu 校验 Verification Token(明文模式,飞书后台不配Encrypt Key)。
 """
 import json, os, subprocess, sys, urllib.parse
+import traceback
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
@@ -18,6 +19,15 @@ TOKEN  = os.environ.get("GATEWAY_TOKEN", "")
 VERIFY = os.environ.get("FEISHU_VERIFY_TOKEN", "")
 BIND   = os.environ.get("GATEWAY_BIND", "127.0.0.1:9000")
 VALID_AGENTS = {"retriever", "executor-code", "executor-data", "executor-3d", "digester", "auditor"}
+LOG = ROOT / "logs" / "feishu_gateway.log"
+
+def audit(msg):
+    try:
+        LOG.parent.mkdir(parents=True, exist_ok=True)
+        with LOG.open("a", encoding="utf-8") as f:
+            f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S} {msg}\n")
+    except Exception:
+        pass
 
 def push(text):
     subprocess.run([str(ROOT/"bin/feishu_push.sh"), text], check=False)
@@ -62,31 +72,46 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path != "/feishu":
+            audit(f"POST unexpected_path path={self.path}")
             return self._send(404, "404")
         raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        ua = self.headers.get("User-Agent", "")
+        audit(f"POST /feishu len={len(raw)} ua={ua}")
         try:
             data = json.loads(raw)
         except Exception:
+            audit(f"bad_json raw={raw[:500]!r}")
             return self._send(400, "bad json")
         # 首次配置回调URL的验证握手
         if data.get("type") == "url_verification":
             return self._send(200, json.dumps({"challenge": data.get("challenge", "")}), "application/json")
         if "encrypt" in data:
+            audit("encrypted_event_rejected")
             return self._send(400, "请在飞书后台关闭Encrypt Key(本网关使用明文模式+Token校验)")
         hdr = data.get("header", {})
+        event_type = hdr.get("event_type")
+        token_match = not VERIFY or hdr.get("token") == VERIFY or data.get("token") == VERIFY
+        audit(f"event_type={event_type} token_match={token_match}")
         if VERIFY and hdr.get("token") != VERIFY and data.get("token") != VERIFY:
+            header_has_token = bool(hdr.get("token"))
+            root_has_token = bool(data.get("token"))
+            audit(f"forbidden header_token={header_has_token} root_token={root_has_token}")
             return self._send(403, "forbidden")
-        if hdr.get("event_type") == "im.message.receive_v1":
+        if event_type == "im.message.receive_v1":
             try:
                 text = json.loads(data["event"]["message"].get("content", "{}")).get("text", "").strip()
             except Exception:
                 text = ""
+            audit(f"message_text={text[:200]!r}")
             if text:
                 self.handle_text(text)
         return self._send(200, json.dumps({"code": 0}), "application/json")
 
     def handle_text(self, text):
         # "派 owl-intel 调研xxx" → 入队;其余一切 → 90-inbox 异步信箱
+        if "检测" in text and "入站" in text:
+            push("已入站")
+            return
         if text.startswith("派 ") or text.startswith("派"):
             parts = text.lstrip("派").strip().split(maxsplit=1)
             if len(parts) == 2 and parts[0] in VALID_AGENTS:

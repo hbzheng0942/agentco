@@ -1,6 +1,6 @@
 name = "retriever"
 description = "检索蒸馏:只读 search.py 抓好的 raw 做分析蒸馏,模型不联网"
-model = "ds-reasoner"
+model = "ds-chat"  # ds-reasoner 在 codex 工具循环恒 400(reasoning_content 回传),与 retriever profile 对齐
 model_provider = "litellm"
 sandbox_mode = "read-only"
 nickname_candidates = ["Scout"]

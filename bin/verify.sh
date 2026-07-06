@@ -18,11 +18,14 @@ ck "selftest: Wave③ 全逻辑" "python3 bin/selftest.py"
 
 # 2. LiteLLM 健康 + 两厂商真实调用
 ck "litellm /health" "curl -sf -m 10 http://127.0.0.1:4000/health -H \"Authorization: Bearer \$LITELLM_MASTER_KEY\""
-for m in ds-chat kimi-long; do
+for m in ds-chat kimi-long qwen-max; do
   ck "litellm chat [$m]" "curl -sf -m 60 http://127.0.0.1:4000/v1/chat/completions -H \"Authorization: Bearer \$LITELLM_MASTER_KEY\" -H 'Content-Type: application/json' -d '{\"model\":\"$m\",\"messages\":[{\"role\":\"user\",\"content\":\"reply OK\"}]}' | grep -qi ok"
 done
 
 # 3. Codex headless auth + 经 LiteLLM 跑国产模型(新 profile)
+# bwrap 沙箱可用性:Ubuntu24 apparmor_restrict_unprivileged_userns=1 会让 codex 内 shell 全灭,
+# agent 读不到文件只能靠先验编造(2026-07-06 实锤)。需 /etc/apparmor.d/bwrap 放行 userns。
+ck "bwrap 沙箱可用(codex worker shell 前提)" "bwrap --unshare-all --ro-bind / / /bin/true"
 ck "codex headless auth" "codex exec 'reply exactly: AUTH_OK' 2>/dev/null | grep -q AUTH_OK"
 ck "codex -p auditor via litellm" "codex exec -p auditor --skip-git-repo-check 'reply exactly: LITELLM_OK' 2>/dev/null | grep -q LITELLM_OK"
 ck "难度路由 profile 已装(executor-data-hi/retriever-long)" "test -f ~/.codex/executor-data-hi.config.toml && test -f ~/.codex/retriever-long.config.toml"
@@ -30,6 +33,7 @@ echo "→ 手动:codex exec -p retriever '报告cwd和可见目录' 确认沙箱
 
 # 4. tool-call 压测
 for m in ds-chat kimi-long; do ck "toolcall stress [$m]" "python3 bin/verify_toolcall.py 20 $m"; done
+ck "toolcall stress [qwen-max]" "python3 bin/verify_toolcall.py 5 qwen-max"   # qwen按token计费,5轮抽检
 
 # 5. search.py 端到端活探针(执行注意点①:真跑带 news 的 query,确认两家 news endpoint 都通)
 if [ -n "${BRAVE_API_KEY:-}" ] || [ -n "${SERPER_API_KEY:-}" ]; then

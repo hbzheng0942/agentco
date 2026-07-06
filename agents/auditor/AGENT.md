@@ -30,7 +30,7 @@
 ---
 task_id: <T-xxx>
 agent: auditor
-model: <ds-reasoner|...>
+model: <qwen-max|...>
 tier: <0|1|2>  # 难度档 light|medium|heavy
 project: <proj|system>
 depends_on: null

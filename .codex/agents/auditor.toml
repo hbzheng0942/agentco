@@ -1,6 +1,6 @@
 name = "auditor"
 description = "系统审计:异模型审各域产出与系统健康,提议进化候选;只提议不执行"
-model = "ds-reasoner"
+model = "qwen-max"
 model_provider = "litellm"
 sandbox_mode = "read-only"
 nickname_candidates = ["Razor"]

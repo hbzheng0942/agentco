@@ -1,5 +1,6 @@
-# auditor — 系统审计(ds-reasoner,异厂商保持苛刻)。只读。turn 上限 5(ttl_sec 兜底)。
-model = "ds-reasoner"
+# auditor — 系统审计(qwen-max=qwen3.7-max@DashScope,与所有产出方异厂商保持苛刻;
+# litellm 层 fallback→ds-chat,切换时 hook 出站飞书通知)。只读。turn 上限 5(ttl_sec 兜底)。
+model = "qwen-max"
 model_provider = "litellm"
 sandbox_mode = "read-only"
 model_instructions_file = "/opt/agentco/config/profile-instructions/auditor.md"

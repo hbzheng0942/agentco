@@ -6,3 +6,6 @@
 | 概念 | 权威文件路径 | scope | 相邻概念 |
 |------|-------------|-------|---------|
 | (示例)assembly 目标 | kb/30-projects/assembly/specs/ | proj | — |
+| ASG(关节场景图) | kb/30-projects/assembly/decisions/20260706-articulation-generation-route.md | proj | 关节生成难度阶梯 |
+| 关节生成难度阶梯(L1/L2/L3) | kb/30-projects/assembly/decisions/20260706-articulation-generation-route.md | proj | ASG、异构路由 |
+| 按部件异构路由 | kb/30-projects/assembly/decisions/20260706-articulation-generation-route.md | proj | 关节生成难度阶梯 |
