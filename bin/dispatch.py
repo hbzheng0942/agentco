@@ -39,8 +39,8 @@ DIFF = {0: "light", 1: "medium", 2: "heavy"}
 PROFILES = json.loads((ROOT/"config/claude-profiles/profiles.json").read_text())
 PROFILE = {  # (agent, tier) -> claude profile(见 config/claude-profiles/profiles.json)
     ("retriever", 0): "retriever",         ("retriever", 1): "retriever",         ("retriever", 2): "retriever-long",
-    ("executor-code", 0): "executor-code", ("executor-code", 1): "executor-code-hi", ("executor-code", 2): "executor-code-hi",
-    ("executor-data", 0): "executor-data", ("executor-data", 1): "executor-data-hi", ("executor-data", 2): "executor-data-hi",
+    ("executor-code", 0): "executor-code", ("executor-code", 1): "executor-code-hi", ("executor-code", 2): "executor-code-heavy",
+    ("executor-data", 0): "executor-data", ("executor-data", 1): "executor-data-hi", ("executor-data", 2): "executor-data-heavy",
     ("executor-3d", 0): "executor-3d",     ("executor-3d", 1): "executor-3d",     ("executor-3d", 2): "executor-3d",
     ("digester", 0): "digester",           ("digester", 1): "digester",           ("digester", 2): "digester-hi",
     ("auditor", 0): "auditor",             ("auditor", 1): "auditor",             ("auditor", 2): "auditor",

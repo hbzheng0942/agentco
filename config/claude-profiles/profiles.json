@@ -1,13 +1,15 @@
 {
-  "_comment": "claude -p worker profiles(替代 codex-profiles/*.toml)。model=litellm别名;难度路由不变:失败不自动升档。tools 统一只读(Read,Glob,Grep),产出经最终消息由 dispatcher 落盘。gpt-plus 未登录时经 litellm fallback→ds-reasoner(出站说明)。",
-  "retriever":        {"model": "ds-chat",   "max_turns": 8,  "instructions": "retriever.md"},
-  "retriever-long":   {"model": "kimi-long", "max_turns": 12, "instructions": "retriever.md"},
-  "executor-code":    {"model": "ds-chat",   "max_turns": 15, "instructions": "executor.md"},
-  "executor-code-hi": {"model": "gpt-plus",  "max_turns": 15, "instructions": "executor.md"},
-  "executor-data":    {"model": "ds-chat",   "max_turns": 12, "instructions": "executor.md"},
-  "executor-data-hi": {"model": "gpt-plus",  "max_turns": 12, "instructions": "executor.md"},
-  "executor-3d":      {"model": "ds-chat",   "max_turns": 15, "instructions": "executor.md"},
-  "digester":         {"model": "ds-chat",   "max_turns": 10, "instructions": "digester.md"},
-  "digester-hi":      {"model": "gpt-plus",  "max_turns": 10, "instructions": "digester.md"},
-  "auditor":          {"model": "qwen-max",  "max_turns": 6,  "instructions": "auditor.md"}
+  "_comment": "claude -p worker profiles。model=litellm别名;难度路由不变:失败不自动升档。tools 统一只读(Read,Glob,Grep),产出经最终消息由 dispatcher 落盘。GPT两档:medium(-hi)=gpt-5.4,heavy(-heavy)=gpt-5.5(Plus配额贵,杂活禁用);断供经litellm fallback→ds-reasoner(出站说明)。auditor:qwen-max半价结束后改此处为 qwen-plus(HB 2026-07-07拍板,异厂商审计不变)。",
+  "retriever":          {"model": "ds-chat",   "max_turns": 8,  "instructions": "retriever.md"},
+  "retriever-long":     {"model": "kimi-long", "max_turns": 12, "instructions": "retriever.md"},
+  "executor-code":      {"model": "ds-chat",   "max_turns": 15, "instructions": "executor.md"},
+  "executor-code-hi":   {"model": "gpt-5.4",   "max_turns": 15, "instructions": "executor.md"},
+  "executor-code-heavy":{"model": "gpt-5.5",   "max_turns": 15, "instructions": "executor.md"},
+  "executor-data":      {"model": "ds-chat",   "max_turns": 12, "instructions": "executor.md"},
+  "executor-data-hi":   {"model": "gpt-5.4",   "max_turns": 12, "instructions": "executor.md"},
+  "executor-data-heavy":{"model": "gpt-5.5",   "max_turns": 12, "instructions": "executor.md"},
+  "executor-3d":        {"model": "ds-chat",   "max_turns": 15, "instructions": "executor.md"},
+  "digester":           {"model": "ds-chat",   "max_turns": 10, "instructions": "digester.md"},
+  "digester-hi":        {"model": "gpt-5.5",   "max_turns": 10, "instructions": "digester.md"},
+  "auditor":            {"model": "qwen-max",  "max_turns": 6,  "instructions": "auditor.md"}
 }

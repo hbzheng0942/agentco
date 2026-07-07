@@ -13,15 +13,27 @@ model_list:
       model: deepseek/deepseek-v4-pro  # 旧名 deepseek-reasoner 2026-07-24 弃用
       api_key: os.environ/DEEPSEEK_API_KEY
 
-  - model_name: qwen-max               # auditor 主力:qwen3.7-max(DashScope OpenAI兼容,原生支持Responses;贵,只给审计)
+  - model_name: qwen-max               # auditor 主力:qwen3.7-max(DashScope OpenAI兼容;半价活动期用)
     litellm_params:
       model: openai/qwen3.7-max
       api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
       api_key: os.environ/DASHSCOPE_API_KEY
 
-  - model_name: gpt-plus               # GPT升级档:ChatGPT Plus经CLIProxyAPI(127.0.0.1:8317)
-    litellm_params:                    # ⚠️ 需 cli-proxy-api --codex-device-login 登录后生效
-      model: openai/gpt-5.5            # TODO:登录后 curl :8317/v1/models 校准 model 名
+  - model_name: qwen-plus              # auditor 接班:qwen3.7-plus(≈ds-v4-pro价位但异厂商;
+    litellm_params:                    # HB 2026-07-07拍板:qwen-max半价结束后auditor切此,改profiles.json一行)
+      model: openai/qwen3.7-plus
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api_key: os.environ/DASHSCOPE_API_KEY
+
+  - model_name: gpt-5.4                # GPT中档:executor/digester medium(-hi);ChatGPT Plus经CLIProxyAPI
+    litellm_params:                    # 2026-07-07 --codex-device-login 已登录,model名经 /v1/models 校准
+      model: openai/gpt-5.4
+      api_base: http://127.0.0.1:8317/v1
+      api_key: os.environ/CLIPROXY_API_KEY
+
+  - model_name: gpt-5.5                # GPT高档:heavy 档专用(Plus配额贵,杂活禁用)
+    litellm_params:
+      model: openai/gpt-5.5
       api_base: http://127.0.0.1:8317/v1
       api_key: os.environ/CLIPROXY_API_KEY
 
@@ -36,7 +48,9 @@ router_settings:
     - kimi-long: ["ds-chat"]           # Kimi挂了降级DeepSeek,保cron不断
     - ds-chat: ["kimi-long"]           # 反向兜底:DeepSeek挂了整链不至于全断
     - qwen-max: ["ds-chat"]            # auditor兜底:qwen挂了降ds-chat(hook出站通知,见litellm_hooks)
-    - gpt-plus: ["ds-reasoner"]        # GPT通道兜底:CLIProxyAPI未登录/断供→ds-reasoner(hook出站通知)
+    - gpt-5.4: ["ds-reasoner"]         # GPT通道兜底:CLIProxyAPI断供/配额撞顶→ds-reasoner(hook出站通知)
+    - gpt-5.5: ["ds-reasoner"]
+    - qwen-plus: ["ds-chat"]           # 接班别名同享兜底
   num_retries: 2
   timeout: 120
 

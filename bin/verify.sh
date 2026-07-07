@@ -17,7 +17,7 @@ ck "schema: events 双触发器存在" "[ \$(sqlite3 state.db \"SELECT count(*) 
 ck "selftest: Wave③ 全逻辑" "python3 bin/selftest.py"
 
 # 2. LiteLLM 健康 + 两厂商真实调用
-ck "litellm /health" "curl -sf -m 10 http://127.0.0.1:4000/health -H \"Authorization: Bearer \$LITELLM_MASTER_KEY\""
+ck "litellm /health" "curl -sf -m 60 http://127.0.0.1:4000/health -H \"Authorization: Bearer \$LITELLM_MASTER_KEY\""  # 7上游逐一探测,10s不够(gpt经CLIProxyAPI慢)
 for m in ds-chat kimi-long qwen-max; do
   ck "litellm chat [$m]" "curl -sf -m 60 http://127.0.0.1:4000/v1/chat/completions -H \"Authorization: Bearer \$LITELLM_MASTER_KEY\" -H 'Content-Type: application/json' -d '{\"model\":\"$m\",\"messages\":[{\"role\":\"user\",\"content\":\"reply OK\"}]}' | grep -qi ok"
 done
@@ -28,7 +28,8 @@ ck "claude -p worker via litellm(ds-chat 工具循环)" "echo '用Read读 kb/00-
 ck "claude profiles.json 全 profile 就位" "python3 -c \"import json;p=json.load(open('config/claude-profiles/profiles.json'));assert all(k in p for k in ['retriever','retriever-long','executor-code','executor-code-hi','executor-data','executor-data-hi','executor-3d','digester','digester-hi','auditor'])\""
 ck "Stop hook 脚本可执行且容错(空输入放行)" "echo '{}' | python3 bin/report_stop_hook.py"
 ck "concierge 会话通(haiku 订阅)" "python3 -c 'import sys;sys.path.insert(0,\"bin\");import concierge;r,_=concierge.chat(\"回复两个字:在的\");sys.exit(0 if r else 1)'"
-ck "gpt-plus 别名存在(CLIProxyAPI,未登录时 fallback ds-reasoner)" "grep -q 'model_name: gpt-plus' config/litellm.yaml && systemctl is-active cliproxyapi"
+ck "CLIProxyAPI 已登录且暴露 gpt-5.4/5.5" "curl -sf -m 10 http://127.0.0.1:8317/v1/models -H \"Authorization: Bearer \$CLIPROXY_API_KEY\" | grep -q 'gpt-5.5'"
+ck "litellm gpt/qwen-plus 别名就位" "grep -q 'model_name: gpt-5.4' config/litellm.yaml && grep -q 'model_name: gpt-5.5' config/litellm.yaml && grep -q 'model_name: qwen-plus' config/litellm.yaml"
 
 # 4. tool-call 压测
 for m in ds-chat kimi-long; do ck "toolcall stress [$m]" "python3 bin/verify_toolcall.py 20 $m"; done

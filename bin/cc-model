@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# cc-model — 用任意 litellm 别名开交互式 Claude Code(worker 同款通道,手动调试/对话用)
+# 用法: bin/cc-model [ds-chat|ds-reasoner|kimi-long|qwen-max|qwen-plus|gpt-5.4|gpt-5.5] [claude 其他参数...]
+# 不带参数缺省 ds-chat。注意:GPT 走 Plus 配额,qwen-max 贵,手动会话自己掂量。
+cd "$(dirname "$0")/.." || exit 1
+set -a; source .env 2>/dev/null; set +a
+exec env ANTHROPIC_BASE_URL=http://127.0.0.1:4000 \
+         ANTHROPIC_AUTH_TOKEN="$LITELLM_MASTER_KEY" \
+         ANTHROPIC_SMALL_FAST_MODEL=ds-chat \
+         claude --model "${1:-ds-chat}" "${@:2}"

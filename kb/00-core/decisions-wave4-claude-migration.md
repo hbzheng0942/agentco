@@ -17,7 +17,8 @@ decider: HB(飞书拍板"一次性切了吧") + CC 执行
 | D4 | 出站:群 webhook 文本 → 应用机器人一任务一卡原地更新(bin/notifier.py);降级链 webhook 保留 | ✅ |
 | D5 | 入站:双速。快车道规则直通;慢车道 concierge(haiku,订阅额度,多轮 --resume);bridge 降为兜底 | ✅ concierge 无工具,动作 JSON 过 bridge.validate_plan 白名单 |
 | D6 | 飞书生态:吃管道(消息API/卡片/docx),不进大脑(Aily 不接);lark-mcp 二期再议 | ✅ |
-| D7 | auditor 暂留 qwen-max(半价活动期沉淀经验),活动结束评估切 gpt-plus | ✅ 改 litellm.yaml 一行即切 |
+| D7 | auditor 暂留 qwen-max(半价活动期);**活动结束切 qwen3.7-plus**(≈ds-v4-pro 价位且保持异厂商审计,HB 2026-07-07 二次拍板,替代原"评估切GPT"方案) | ✅ litellm 别名 qwen-plus 已备好+已实测,届时改 profiles.json auditor 一行 |
+| D8 | GPT 难度分档:medium(-hi)=gpt-5.4,heavy(-heavy)=gpt-5.5;只用这两个(5.4-mini/codex 系不用) | ✅ 2026-07-07 登录后经 /v1/models 校准并 E2E(T-20260707-008 走 gpt-5.4 全链路) |
 
 ## 关键实现事实
 
@@ -30,7 +31,7 @@ decider: HB(飞书拍板"一次性切了吧") + CC 执行
 
 ## 风险与遗留
 
-1. **CLIProxyAPI 未登录**:需 HB 手动 `vendor/cliproxyapi/cli-proxy-api --codex-device-login`;登录后 `curl :8317/v1/models` 校准 litellm.yaml 里 gpt-plus 的 model 名(现为占位 gpt-5.5)。在此之前 -hi 档实际由 ds-reasoner 承接(litellm fallback,有出站说明)。
+1. ~~CLIProxyAPI 未登录~~ 2026-07-07 HB 已 --codex-device-login;/v1/models 实况:gpt-5.5/gpt-5.4/gpt-5.4-mini/gpt-5.3-codex-spark 等;litellm 已校准为 gpt-5.4/gpt-5.5 双别名(各 fallback ds-reasoner)。手动交互入口:`bin/cc-model <别名>`。
 2. **ToS 风险**:CLIProxyAPI 属 OpenAI ToS 灰区,有封号可能;codex CLI 未卸载,作为 GPT 通道逃生舱。
 3. **成本水位**:Claude harness 每轮固定开销高于 codex exec(万 token 级);ds 有缓存折扣,qwen-max(auditor)固定开销上涨,月度预算 200 USD 水位周治理盯一周。
 4. 旧 T-20260707-005 inbox 正文不全(hook 修复前产物),原文在 traces/retriever/20260707/。
