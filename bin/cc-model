@@ -1,10 +1,23 @@
 #!/usr/bin/env bash
-# cc-model — 用任意 litellm 别名开交互式 Claude Code(worker 同款通道,手动调试/对话用)
-# 用法: bin/cc-model [ds-chat|ds-reasoner|kimi-long|qwen-max|qwen-plus|gpt-5.4|gpt-5.5] [claude 其他参数...]
-# 不带参数缺省 ds-chat。注意:GPT 走 Plus 配额,qwen-max 贵,手动会话自己掂量。
+# cc-model — litellm 网关版 Claude Code(双终端工作流之"执行域终端",与订阅终端并行)
+#
+# 用法: bin/cc-model [初始模型别名] [claude 其他参数...]     缺省 ds-chat
+#
+# 会话内切模型(litellm 全家):
+#   /model opus|sonnet|haiku     → 槽位映射:opus=gpt-5.5  sonnet=gpt-5.4  haiku=ds-chat
+#   /model <任意litellm别名>      → ds-chat/ds-reasoner/kimi-long/qwen-max/qwen-plus/gpt-5.4/gpt-5.5
+#   subagent frontmatter model:  → 同样解析 litellm 别名(retriever/executor/digester/auditor 已绑)
+# 槽位映射可用环境变量覆盖:CC_OPUS/CC_SONNET/CC_HAIKU
+#
+# ⚠️ 本终端切不到真 Claude 模型(端点隔离);判断层(strategist/architect/warden)用订阅终端。
+#    GPT 走 Plus 配额、qwen-max 贵,手动会话自己掂量。
 cd "$(dirname "$0")/.." || exit 1
 set -a; source .env 2>/dev/null; set +a
 exec env ANTHROPIC_BASE_URL=http://127.0.0.1:4000 \
          ANTHROPIC_AUTH_TOKEN="$LITELLM_MASTER_KEY" \
+         ANTHROPIC_DEFAULT_OPUS_MODEL="${CC_OPUS:-gpt-5.5}" \
+         ANTHROPIC_DEFAULT_SONNET_MODEL="${CC_SONNET:-gpt-5.4}" \
+         ANTHROPIC_DEFAULT_HAIKU_MODEL="${CC_HAIKU:-ds-chat}" \
          ANTHROPIC_SMALL_FAST_MODEL=ds-chat \
+         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
          claude --model "${1:-ds-chat}" "${@:2}"
