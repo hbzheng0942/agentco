@@ -32,6 +32,15 @@ def load_env():
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip())
 
+def claude_bin():
+    """claude CLI 绝对路径:nvm 安装不在 systemd/cron 最小 PATH 里(2026-07-07 gateway 实锤)。"""
+    import glob, shutil
+    p = shutil.which("claude")
+    if p:
+        return p
+    cands = sorted(glob.glob(str(Path.home()/".nvm/versions/node/*/bin/claude")))
+    return cands[-1] if cands else "claude"
+
 def db():
     c = sqlite3.connect(ROOT/"state.db", timeout=30); c.row_factory = sqlite3.Row
     c.execute("PRAGMA busy_timeout=30000")   # 域级并发派工后多写者共存,等锁不炸

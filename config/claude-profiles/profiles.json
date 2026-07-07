@@ -1,0 +1,13 @@
+{
+  "_comment": "claude -p worker profiles(替代 codex-profiles/*.toml)。model=litellm别名;难度路由不变:失败不自动升档。tools 统一只读(Read,Glob,Grep),产出经最终消息由 dispatcher 落盘。gpt-plus 未登录时经 litellm fallback→ds-reasoner(出站说明)。",
+  "retriever":        {"model": "ds-chat",   "max_turns": 8,  "instructions": "retriever.md"},
+  "retriever-long":   {"model": "kimi-long", "max_turns": 12, "instructions": "retriever.md"},
+  "executor-code":    {"model": "ds-chat",   "max_turns": 15, "instructions": "executor.md"},
+  "executor-code-hi": {"model": "gpt-plus",  "max_turns": 15, "instructions": "executor.md"},
+  "executor-data":    {"model": "ds-chat",   "max_turns": 12, "instructions": "executor.md"},
+  "executor-data-hi": {"model": "gpt-plus",  "max_turns": 12, "instructions": "executor.md"},
+  "executor-3d":      {"model": "ds-chat",   "max_turns": 15, "instructions": "executor.md"},
+  "digester":         {"model": "ds-chat",   "max_turns": 10, "instructions": "digester.md"},
+  "digester-hi":      {"model": "gpt-plus",  "max_turns": 10, "instructions": "digester.md"},
+  "auditor":          {"model": "qwen-max",  "max_turns": 6,  "instructions": "auditor.md"}
+}

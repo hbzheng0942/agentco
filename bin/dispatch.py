@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
-"""agentco dispatcher (Wave③) — 队列在 Codex 外,Codex 只当 worker。
+"""agentco dispatcher (Wave④) — 队列在引擎外,claude -p 只当 worker(2026-07-07 由 codex exec 切换)。
 cron 每 5 分钟;四域独立文件锁并行消费(域内串行),慢任务只阻塞本域。
+
+Wave④ 变更(引擎迁移+出站重构):
+- worker: codex exec -p → claude -p(经 litellm /v1/messages,ANTHROPIC_BASE_URL 注入);
+  profile 定义移至 config/claude-profiles/profiles.json(model=litellm别名/max_turns/instructions)。
+- envelope 2.0:产出须含 ```report 块(tldr/highlights/action_needed/confidence),
+  Stop hook(bin/report_stop_hook.py)协议级强制;缺块记 report_missing 事件进周治理。
+- 出站:notifier.py 一任务一卡原地更新(running/done/review/blocked),模型独白永不上卡;
+  应用凭据/chat_id 缺失时降级 webhook 文本,信号永不丢。
 
 Wave③ 变更:
 - 工具域 4:retriever / executor-{code,data,3d} / digester / auditor(worker=profile 变体)。
@@ -13,13 +21,13 @@ Wave③ 变更:
 - 难度路由(Wave③后修订):tier=难度档(0=light 1=medium 2=heavy),派单时定;
   失败同档重试 2 次即 blocked,不再自动升档换厂商。
 """
-import fcntl, multiprocessing, re, sqlite3, subprocess, sys, threading
+import fcntl, json, multiprocessing, os, re, sqlite3, subprocess, sys, threading
 from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from agentlib import load_env
-load_env()  # cron 环境无 .env 变量;codex/feishu_card 子进程靠继承 os.environ 拿 LITELLM_MASTER_KEY 等
+from agentlib import claude_bin, load_env
+load_env()  # cron 环境无 .env 变量;claude/notifier 子进程靠继承 os.environ 拿 LITELLM_MASTER_KEY 等
 
 ROOT = Path(__file__).resolve().parent.parent
 DB, TRACES, LOG = ROOT/"state.db", ROOT/"traces", ROOT/"logs/dispatch.log"
@@ -28,7 +36,8 @@ MAX_ATTEMPTS = 2
 # 难度路由:tier=难度档(0=light 1=medium 2=heavy),入队时定,失败不自动升档。
 # 多模态仅 GPT 通道(-hi profile)可用;auditor 刻意不给 GPT(审 executor 产出须异厂商)。
 DIFF = {0: "light", 1: "medium", 2: "heavy"}
-PROFILE = {  # (agent, tier) -> codex profile
+PROFILES = json.loads((ROOT/"config/claude-profiles/profiles.json").read_text())
+PROFILE = {  # (agent, tier) -> claude profile(见 config/claude-profiles/profiles.json)
     ("retriever", 0): "retriever",         ("retriever", 1): "retriever",         ("retriever", 2): "retriever-long",
     ("executor-code", 0): "executor-code", ("executor-code", 1): "executor-code-hi", ("executor-code", 2): "executor-code-hi",
     ("executor-data", 0): "executor-data", ("executor-data", 1): "executor-data-hi", ("executor-data", 2): "executor-data-hi",
@@ -95,12 +104,33 @@ def split_envelope(final):
     return "\n".join(lines[:i]).rstrip(), urls, (m_hash.group(1) if m_hash else None)
 
 def profile_model(profile):
-    f = Path.home()/".codex"/f"{profile}.config.toml"
-    if f.exists():
-        m = re.search(r'^model\s*=\s*"([^"]+)"', f.read_text(), re.M)
-        if m:
-            return m.group(1)
-    return "gpt-plus-default"   # -hi 档不写 model = 用 ChatGPT 登录账号默认模型
+    return PROFILES.get(profile, {}).get("model", "unknown")
+
+
+# ---- claude -p worker 调用 ----
+WORKER_TOOLS_ALLOW = "Read,Glob,Grep"           # 与 codex read-only 沙箱等价:只读,产出经最终消息落盘
+WORKER_TOOLS_DENY = "Bash,Write,Edit,NotebookEdit,WebSearch,WebFetch,Task,TodoWrite"
+
+def worker_cmd_env(profile, max_turns_override=None):
+    """构造 claude -p 命令与环境。spec 经 stdin 注入(防长 spec 撑爆 argv/与变长 flag 冲突)。"""
+    prof = PROFILES[profile]
+    instr = (ROOT/"config/profile-instructions"/prof["instructions"]).read_text()
+    instr += (ROOT/"config/profile-instructions/_report.md").read_text()
+    cmd = [claude_bin(), "-p", "--model", prof["model"],
+           "--max-turns", str(max_turns_override or prof["max_turns"]),
+           "--output-format", "json", "--strict-mcp-config", "--setting-sources", "",
+           "--settings", str(ROOT/"config/claude-profiles/worker-settings.json"),
+           "--allowedTools", WORKER_TOOLS_ALLOW, "--disallowedTools", WORKER_TOOLS_DENY,
+           "--append-system-prompt", instr]
+    env = os.environ.copy()
+    env.update({
+        "CLAUDE_CONFIG_DIR": str(ROOT/".claude-worker"),   # 与主会话配置隔离
+        "ANTHROPIC_BASE_URL": "http://127.0.0.1:4000",     # litellm /v1/messages
+        "ANTHROPIC_AUTH_TOKEN": os.environ.get("LITELLM_MASTER_KEY", ""),
+        "ANTHROPIC_SMALL_FAST_MODEL": "ds-chat",           # harness 后台小调用也走廉价档
+        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    })
+    return cmd, env
 
 def canonical_envelope(t, profile, urls, chash, artifacts):
     return ("---\n"
@@ -150,26 +180,40 @@ def run_task(db, t):
     trace_dir = TRACES/agent/datetime.now().strftime("%Y%m%d"); trace_dir.mkdir(parents=True, exist_ok=True)
     trace = trace_dir/f"{tid}.a{t['attempts']}.jsonl"
     log(f"{tid} -> {profile} (attempt {t['attempts']+1})")
+    from notifier import notify, parse_report
     hb = None
-    if t["notify"]:   # 长任务心跳:ttl 70% 仍未完 → 出站告知还活着,免得静默到超时
+    if t["notify"]:   # 长任务心跳:ttl 70% 仍未完 → 卡片原地更新(降级:文本出站),免得静默到超时
+        notify(tid, "running")
         hb_sec = max(60, int(t["ttl_sec"]*0.7))
-        hb = threading.Timer(hb_sec, feishu,
-            [f"⏳ {tid} {t['title']} 仍在运行(已 {hb_sec//60} 分钟,上限 {t['ttl_sec']//60} 分钟)agent={agent}"])
+        def _heartbeat():
+            if not notify(tid, "running", extra={"elapsed_min": hb_sec//60}):
+                feishu(f"⏳ {tid} {t['title']} 仍在运行(已 {hb_sec//60} 分钟,上限 {t['ttl_sec']//60} 分钟)agent={agent}")
+        hb = threading.Timer(hb_sec, _heartbeat)
         hb.daemon = True; hb.start()
-    # start_new_session:codex(node→二进制)是多级进程树,超时必须整组杀,
-    # 否则孙进程成孤儿继续烧上游 token(2026-07-07 T-003 实锤:超时后 codex 二进制存活并与重试并跑)
-    p = subprocess.Popen(
-        ["codex", "exec", "-p", profile, "--json",
-         "--cd", str(ROOT), "--output-last-message", str(trace)+".final", "--", spec],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+    # start_new_session:claude(node)与 codex 同为多级进程树,超时必须整组杀,
+    # 否则孙进程成孤儿继续烧上游 token(2026-07-07 T-003 codex 实锤,同坑防复发)
+    cmd, wenv = worker_cmd_env(profile)
+    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         text=True, start_new_session=True, cwd=str(ROOT), env=wenv)
+    final, cost, dur_s = None, 0.0, 0
     try:
-        out, err = p.communicate(timeout=t["ttl_sec"])
+        out, err = p.communicate(input=spec, timeout=t["ttl_sec"])
         trace.write_text(out + (f"\n\n# stderr\n{err}" if err else ""))
-        ok = p.returncode == 0 and Path(str(trace)+".final").exists()
+        ok = p.returncode == 0
+        if ok:
+            try:   # --output-format json:最后一行 JSON,result=最终消息
+                res = json.loads(out.strip().splitlines()[-1])
+                ok = not res.get("is_error") and bool(res.get("result", "").strip())
+                final = res.get("result", "")
+                cost = res.get("total_cost_usd") or 0.0
+                dur_s = int((res.get("duration_ms") or 0)/1000)
+            except Exception as e:
+                ok = False
+                ev(db, tid, agent, "fail", f"claude 输出不可解析: {str(e)[:120]}")
     except subprocess.TimeoutExpired:
-        import os as _os, signal as _sig
+        import signal as _sig
         try:
-            _os.killpg(p.pid, _sig.SIGKILL)
+            os.killpg(p.pid, _sig.SIGKILL)
         except ProcessLookupError:
             pass
         p.communicate()
@@ -180,10 +224,12 @@ def run_task(db, t):
             hb.cancel()
 
     if ok:
-        final = Path(str(trace)+".final").read_text()
         body, urls, chash = split_envelope(final)
         if urls is None and chash is None:
             ev(db, tid, agent, "envelope_missing", profile)   # 模型没写 envelope,进周治理统计
+        report = parse_report(body)
+        if not report.get("tldr"):
+            ev(db, tid, agent, "report_missing", profile)     # Stop hook 漏网,进周治理统计
         proj = t["project"] or "default"
         out = ROOT/"handoff"/proj/f"{tid}.result.md"          # 与 spec 同项目目录,禁扁平落 handoff/
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -206,26 +252,20 @@ def run_task(db, t):
         if new_status == "done":
             trigger_dependents(db, tid)
         if t["notify"]:
-            paths = " ; ".join(artifacts)
-            if new_status == "review":
-                subprocess.run([sys.executable, str(ROOT/"bin/feishu_card.py"),
-                                tid, t["title"], f"📄 {paths}\n\n{body[:600]}"], check=False)
-            else:
-                head = f"✅ {tid} {t['title']}\nagent={agent} difficulty={DIFF.get(tier, tier)}\n📄 {paths}"
-                link = feishu_archive(inbox or out, f"{tid}-{agent}.md")
-                if link:            # md 产物已存档飞书:发链接+摘要,不刷全文
-                    feishu(f"{head}\n☁️ {link}\n---\n{body[:300]}")
-                elif len(body) <= 800:   # 无存档通道:短产出退全文
-                    feishu(f"{head}\n---\n{body}")
-                else:
-                    feishu(f"{head}\n(超800字,全文见上述路径)\n---\n{body[:800]}")
+            link = feishu_archive(inbox or out, f"{tid}-{agent}.md")
+            extra = {"artifacts": artifacts, "doc_url": link, "cost": cost, "dur_s": dur_s}
+            if not report.get("tldr"):   # report 缺失兜底:首段截断,好过独白但记账督促
+                report = {"tldr": body.strip().splitlines()[0][:60] if body.strip() else "(空产出)"}
+            notify(tid, "review" if new_status == "review" else "done", report, extra)
     else:
         attempts = t["attempts"]+1
         # 失败不换厂商:难度是入队时已知的任务属性,失败是给人看的信号(裁决后可改难度重派)
         if attempts >= MAX_ATTEMPTS:
             db.execute("UPDATE tasks SET status='blocked',attempts=?,updated_at=datetime('now') WHERE id=?", (attempts, tid))
             ev(db, tid, agent, "block", f"max attempts at difficulty={DIFF.get(tier, tier)}")
-            feishu(f"🛑 {tid} {t['title']} BLOCKED,需人工裁决(可改难度重派)。trace: {trace}")
+            notify(tid, "blocked", {"tldr": f"连续 {attempts} 次失败,需人工裁决(可改难度重派)"},
+                   {"reason": f"max attempts at difficulty={DIFF.get(tier, tier)}",
+                    "trace": str(trace.relative_to(ROOT))})
             propagate_block(db, t)
         else:
             db.execute("UPDATE tasks SET attempts=?,status='queued',updated_at=datetime('now') WHERE id=?", (attempts, tid))

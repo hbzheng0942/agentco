@@ -9,3 +9,10 @@ __pycache__/
 .DS_Store
 *.pem
 ecs/*.pem
+.claude-worker/
+vendor/cliproxyapi/cli-proxy-api
+vendor/cliproxyapi/config.yaml
+vendor/cliproxyapi/auths/
+logs/feishu_notify_chat
+logs/concierge_session
+logs/.feishu_tenant_token.json

@@ -22,14 +22,13 @@ for m in ds-chat kimi-long qwen-max; do
   ck "litellm chat [$m]" "curl -sf -m 60 http://127.0.0.1:4000/v1/chat/completions -H \"Authorization: Bearer \$LITELLM_MASTER_KEY\" -H 'Content-Type: application/json' -d '{\"model\":\"$m\",\"messages\":[{\"role\":\"user\",\"content\":\"reply OK\"}]}' | grep -qi ok"
 done
 
-# 3. Codex headless auth + 经 LiteLLM 跑国产模型(新 profile)
-# bwrap 沙箱可用性:Ubuntu24 apparmor_restrict_unprivileged_userns=1 会让 codex 内 shell 全灭,
-# agent 读不到文件只能靠先验编造(2026-07-06 实锤)。需 /etc/apparmor.d/bwrap 放行 userns。
-ck "bwrap 沙箱可用(codex worker shell 前提)" "bwrap --unshare-all --ro-bind / / /bin/true"
-ck "codex headless auth" "codex exec 'reply exactly: AUTH_OK' 2>/dev/null | grep -q AUTH_OK"
-ck "codex -p auditor via litellm" "codex exec -p auditor --skip-git-repo-check 'reply exactly: LITELLM_OK' 2>/dev/null | grep -q LITELLM_OK"
-ck "难度路由 profile 已装(executor-data-hi/retriever-long)" "test -f ~/.codex/executor-data-hi.config.toml && test -f ~/.codex/retriever-long.config.toml"
-echo "→ 手动:codex exec -p retriever '报告cwd和可见目录' 确认沙箱边界;确认 retriever 无联网(trace 无 web_search)"
+# 3. claude -p worker 引擎(Wave④:codex → claude,经 litellm /v1/messages)
+ck "litellm /v1/messages(anthropic 格式端点)" "curl -sf -m 60 http://127.0.0.1:4000/v1/messages -H \"Authorization: Bearer \$LITELLM_MASTER_KEY\" -H 'Content-Type: application/json' -d '{\"model\":\"ds-chat\",\"max_tokens\":50,\"messages\":[{\"role\":\"user\",\"content\":\"reply OK\"}]}' | grep -q '\"type\":\"message\"'"
+ck "claude -p worker via litellm(ds-chat 工具循环)" "echo '用Read读 kb/00-core/principles.md 第一行然后原样输出' | CLAUDE_CONFIG_DIR=$ROOT/.claude-worker ANTHROPIC_BASE_URL=http://127.0.0.1:4000 ANTHROPIC_AUTH_TOKEN=\$LITELLM_MASTER_KEY CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 timeout 120 claude -p --model ds-chat --max-turns 4 --output-format json --strict-mcp-config --setting-sources '' --allowedTools 'Read,Glob,Grep' --disallowedTools 'Bash,Write,Edit,WebSearch,WebFetch,Task' | python3 -c 'import json,sys; d=json.loads(sys.stdin.read().splitlines()[-1]); sys.exit(0 if not d[\"is_error\"] and d[\"num_turns\"]>=2 else 1)'"
+ck "claude profiles.json 全 profile 就位" "python3 -c \"import json;p=json.load(open('config/claude-profiles/profiles.json'));assert all(k in p for k in ['retriever','retriever-long','executor-code','executor-code-hi','executor-data','executor-data-hi','executor-3d','digester','digester-hi','auditor'])\""
+ck "Stop hook 脚本可执行且容错(空输入放行)" "echo '{}' | python3 bin/report_stop_hook.py"
+ck "concierge 会话通(haiku 订阅)" "python3 -c 'import sys;sys.path.insert(0,\"bin\");import concierge;r,_=concierge.chat(\"回复两个字:在的\");sys.exit(0 if r else 1)'"
+ck "gpt-plus 别名存在(CLIProxyAPI,未登录时 fallback ds-reasoner)" "grep -q 'model_name: gpt-plus' config/litellm.yaml && systemctl is-active cliproxyapi"
 
 # 4. tool-call 压测
 for m in ds-chat kimi-long; do ck "toolcall stress [$m]" "python3 bin/verify_toolcall.py 20 $m"; done

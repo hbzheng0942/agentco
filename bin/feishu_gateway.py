@@ -5,7 +5,7 @@
   GET  /health
 安全:绑127.0.0.1,经Cloudflare Tunnel暴露;/review 需 GATEWAY_TOKEN;/feishu 校验 Verification Token(明文模式,飞书后台不配Encrypt Key)。
 """
-import json, os, re, subprocess, sys, urllib.parse
+import json, os, re, subprocess, sys, threading, urllib.parse
 import traceback
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -106,6 +106,13 @@ class H(BaseHTTPRequestHandler):
             if not authed:
                 return self._send(403, "forbidden")
             ok, msg = apply_review(q.get("tid", ""), q.get("action", ""), q.get("note", ""))
+            if ok:   # 卡片原地翻状态(adopted/rework/reject);降级无害
+                try:
+                    import notifier
+                    notifier.notify(q["tid"], {"adopt": "adopted", "rework": "rework", "reject": "reject"}[q["action"]],
+                                    extra={"verdict_note": q.get("note", "")} if q.get("note") else None)
+                except Exception:
+                    pass
             return self._send(200 if ok else 400,
                 f"<html><body style='font-size:22px;padding:40px'>{'✅' if ok else '⚠️'} {msg}</body></html>")
         if u.path == "/proposal":   # 进化提议裁决(签名链接;adopt 自动入队 apply 任务)
@@ -183,17 +190,24 @@ class H(BaseHTTPRequestHandler):
             return self._send(403, "forbidden")
         if event_type == "im.message.receive_v1":
             try:
-                text = json.loads(data["event"]["message"].get("content", "{}")).get("text", "").strip()
+                msg = data["event"]["message"]
+                text = json.loads(msg.get("content", "{}")).get("text", "").strip()
             except Exception:
-                text = ""
+                msg, text = {}, ""
+            if msg.get("chat_id"):   # 捕获收件会话:notifier 卡片出站用(单用户系统,最近私聊即收件箱)
+                try:
+                    (Path(__file__).resolve().parent.parent/"logs/feishu_notify_chat").write_text(msg["chat_id"])
+                except Exception:
+                    pass
             audit(f"message_text={text[:200]!r}")
             if text:
                 self.handle_text(text)
         return self._send(200, json.dumps({"code": 0}), "application/json")
 
     def handle_text(self, text):
-        # 确定性梯度:规则快路径("派 <agent> <任务>"精确格式,零延迟)→ bridge(ds-chat 分诊)
-        # → 规则宽松解析 → inbox。任何一层失败都降级,消息永不丢。
+        # 双速入站(Wave④):规则快路径("派 <agent> <任务>"精确格式,零延迟)→
+        # 慢车道 concierge(haiku 多轮会话,后台线程,不阻塞单线程HTTP服务)→
+        # concierge 失败降级 bridge(ds-chat 单轮分诊)→ 规则宽松解析 → inbox。消息永不丢。
         text = strip_mentions(text)
         if "检测" in text and "入站" in text:
             push("已入站")
@@ -204,6 +218,36 @@ class H(BaseHTTPRequestHandler):
             tid = enqueue(agent, task[:40], task, query=(task[:100] if agent == "retriever" else None))
             push(f"📥 已入队 {tid} → {agent}\n{task[:100]}")
             return
+        threading.Thread(target=self.slow_lane, args=(text,), daemon=True).start()
+
+    def slow_lane(self, text):
+        try:
+            import concierge
+            reply, actions = concierge.chat(text)
+        except Exception as e:
+            audit(f"concierge_error {e}")
+            reply, actions = None, None
+        if reply is None:                      # concierge 不可用 → 原 bridge 链
+            audit("concierge_unavailable -> bridge")
+            return self.bridge_lane(text)
+        if actions:
+            plan = bridge.validate_plan(actions)   # 白名单校验:agent/难度/意图全枚举,不信任模型输出
+            if plan and plan["intent"] == "dispatch":
+                if bridge.needs_confirm(plan):     # 大批量/heavy:先确认再入队
+                    pid, url = bridge.stash_plan(plan)
+                    reply += (f"\n\n🧾 拆解出 {len(plan['tasks'])} 个任务,含大活,请确认:\n"
+                              f"{bridge.plan_summary(plan)}\n✅ 确认入队 {url}\n(不点=不执行,24h 过期)")
+                else:
+                    reply += "\n\n" + bridge.execute_plan(plan)
+            elif plan and plan["intent"] == "cancel" and plan["task_ref"]:
+                reply += "\n\n" + bridge.cancel_task(plan["task_ref"])
+            elif (actions.get("intent") == "idea") if isinstance(actions, dict) else False:
+                f = ROOT/"kb/90-inbox"/f"idea-{datetime.now():%Y%m%d-%H%M%S}.md"
+                f.write_text(f"---\nsource: feishu-concierge\ndate: {datetime.now():%Y-%m-%d %H:%M}\nstatus: raw\n---\n\n{text}\n")
+                reply += "\n\n📝 已收进 inbox"
+        push(reply[:2000])
+
+    def bridge_lane(self, text):
         plan = bridge.classify(text)
         if plan:
             audit(f"bridge intent={plan['intent']} tasks={len(plan['tasks'])}")
