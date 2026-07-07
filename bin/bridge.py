@@ -32,6 +32,10 @@ agent 域(必须精确使用这些名字):
 
 intent: dispatch(要求干活)/ status(问任务进度或系统状态)/ cancel(撤销任务)/ idea(想法、感想、不确定的一律选它)
 
+协作流水线(优先用):"调研X并深度分析/出报告"类需求拆两级链——task0=retriever(light,抓取+初筛)
++ task1=digester(depends_idx:0,深度分析,身份是推理模型,body 写明分析框架与交付深度);
+需交叉核验再加 task2=auditor(depends_idx:1)。单纯查快讯/找资料只派 retriever 一级,不硬拆链。
+
 dispatch 时输出 tasks(≤5 个),每项:
 {"agent": "...", "title": "≤30字标题", "body": "给 worker 的完整任务书:目标、验收要点、边界(不做什么)",
  "difficulty": "light|medium|heavy"(缺省:executor 用 medium,其余 light;超长材料/多模态才 heavy),

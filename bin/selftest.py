@@ -135,7 +135,9 @@ def t_dispatch():
     # 难度路由:executor 缺省 medium(GPT),其余缺省 light;显式 heavy 可用;失败不升档(escalate 分支已移除)
     tier = lambda tid: c.execute("SELECT tier FROM tasks WHERE id=?", (tid,)).fetchone()[0]
     check("routing: executor 缺省 medium(tier=1→GPT)", tier(d) == 1
-          and dispatch.PROFILE[("executor-code", 1)] == "executor-code-hi")
+          and dispatch.PROFILE[("executor-code", 1)] == "executor"
+          and dispatch.PROFILES["executor"]["model"].startswith("gpt-")
+          and dispatch.PROFILE[("executor-code", 0)] == "executor-ds")
     h = agentlib.enqueue("retriever", "H", "x", project="assembly", difficulty="heavy")
     check("routing: retriever heavy → kimi-long(tier=2)", tier(h) == 2
           and dispatch.PROFILE[("retriever", 2)] == "retriever-long")

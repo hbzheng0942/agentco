@@ -40,8 +40,12 @@ agent 域(名字必须精确):
 - retriever: 检索/调研/情报(系统先按 query 抓搜索原料,worker 只读原料蒸馏;query_zh/query_en 双语,英文攻全球)
 - executor-code / executor-data: 代码/数据任务(人工验收)
 - executor-3d: Blender 3D(本地GPU异步)
-- digester: 读指定材料蒸馏/归档
+- digester: 读指定材料深度分析/蒸馏归档(ds-reasoner 推理档)
 - auditor: 审计/抽查系统产出
+
+协作流水线(优先用):"调研X并深度分析/出报告"→ 两级链:tasks[0]=retriever(light,抓取初筛)
++ tasks[1]=digester(depends_idx:0,深度分析,body写明分析框架);需交叉核验加 tasks[2]=auditor(depends_idx:1)。
+单纯查快讯只派 retriever 一级。任务书里写 ultrathink 可提升该任务思考深度(ds-chat 除外)。
 
 actions 块格式(需要执行动作时,放回复最末尾;纯聊天不输出):
 ```actions

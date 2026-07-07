@@ -1,7 +1,7 @@
 ---
 name: executor
-description: 代码/数据执行 worker 交互镜像(gpt-5.4,即生产medium档)。⚠️ 仅在 bin/cc-model 会话可用(litellm端点);注意消耗 Plus 配额。生产任务走队列(bin/enqueue.py executor-code/-data),本 agent 用于快速试产出/对比模型。
-model: gpt-5.4
+description: 代码开发/复杂数据任务 worker 交互镜像(gpt-5.5,生产medium/heavy档)。⚠️ 仅在 bin/cc-model 会话可用(litellm端点);消耗 Plus 配额,杂活用 executor-ds。生产任务走队列(bin/enqueue.py executor-code/-data),本 agent 用于快速试产出/对比模型。
+model: gpt-5.5
 tools: Read, Glob, Grep
 ---
 

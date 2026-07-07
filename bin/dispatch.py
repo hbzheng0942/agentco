@@ -38,9 +38,10 @@ MAX_ATTEMPTS = 2
 DIFF = {0: "light", 1: "medium", 2: "heavy"}
 PROFILES = json.loads((ROOT/"config/claude-profiles/profiles.json").read_text())
 PROFILE = {  # (agent, tier) -> claude profile(见 config/claude-profiles/profiles.json)
+    # executor 两档制(2026-07-08):light=executor-ds(ds-chat 杂活),medium/heavy=executor(gpt-5.5 代码开发)
     ("retriever", 0): "retriever",         ("retriever", 1): "retriever",         ("retriever", 2): "retriever-long",
-    ("executor-code", 0): "executor-code", ("executor-code", 1): "executor-code-hi", ("executor-code", 2): "executor-code-heavy",
-    ("executor-data", 0): "executor-data", ("executor-data", 1): "executor-data-hi", ("executor-data", 2): "executor-data-heavy",
+    ("executor-code", 0): "executor-ds",   ("executor-code", 1): "executor",      ("executor-code", 2): "executor",
+    ("executor-data", 0): "executor-ds",   ("executor-data", 1): "executor",      ("executor-data", 2): "executor",
     ("executor-3d", 0): "executor-3d",     ("executor-3d", 1): "executor-3d",     ("executor-3d", 2): "executor-3d",
     ("digester", 0): "digester",           ("digester", 1): "digester",           ("digester", 2): "digester-hi",
     ("auditor", 0): "auditor",             ("auditor", 1): "auditor",             ("auditor", 2): "auditor",
@@ -123,6 +124,8 @@ def worker_cmd_env(profile, max_turns_override=None):
            "--allowedTools", WORKER_TOOLS_ALLOW, "--disallowedTools", WORKER_TOOLS_DENY,
            "--append-system-prompt", instr]
     env = os.environ.copy()
+    if prof.get("max_thinking_tokens"):   # effort 档位(profile 级);spec 里写 ultrathink 等关键词是任务级
+        env["MAX_THINKING_TOKENS"] = str(prof["max_thinking_tokens"])
     env.update({
         "CLAUDE_CONFIG_DIR": str(ROOT/".claude-worker"),   # 与主会话配置隔离
         "ANTHROPIC_BASE_URL": "http://127.0.0.1:4000",     # litellm /v1/messages
@@ -160,6 +163,19 @@ def search_preprocess(db, t, spec):
         log(f"{t['id']} search.py 失败:{e}")
         return spec
 
+# ---- 依赖注入:上游产出路径显式给下游(协作只认带 hash 的 artifact,不让 worker 自己找) ----
+def dep_preprocess(db, t, spec):
+    dep = t["depends_on"]
+    if not dep:
+        return spec
+    r = db.execute("SELECT result_path FROM tasks WHERE id=?", (dep,)).fetchone()
+    if r and r["result_path"] and (ROOT/r["result_path"]).exists():
+        return (f"# 上游产出(depends_on={dep})\n路径:{r['result_path']}\n"
+                f"它是你的输入源:先读它;其 envelope 的 content_hash/source_urls 必须继承进你的 envelope。\n\n" + spec)
+    ev(db, t["id"], t["agent"], "dep_artifact_missing", str(dep))
+    return spec
+
+
 def run_task(db, t):
     tid, agent, tier = t["id"], t["agent"], t["tier"]
     profile = PROFILE.get((agent, tier))
@@ -177,6 +193,7 @@ def run_task(db, t):
     record_skill_hits(db, tid, agent, spec)
     if agent == "retriever":
         spec = search_preprocess(db, t, spec)
+    spec = dep_preprocess(db, t, spec)
     trace_dir = TRACES/agent/datetime.now().strftime("%Y%m%d"); trace_dir.mkdir(parents=True, exist_ok=True)
     trace = trace_dir/f"{tid}.a{t['attempts']}.jsonl"
     log(f"{tid} -> {profile} (attempt {t['attempts']+1})")

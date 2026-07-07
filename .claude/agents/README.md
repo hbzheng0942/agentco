@@ -28,6 +28,22 @@
 生产任务永远走队列(飞书"派"/bin/enqueue.py → dispatch cron),那边有难度路由、
 envelope/report 强制、验收闭环、预算记账——镜像 agent 没有这些护栏。
 
+## Effort(思考深度)怎么调——不是写死的,三个层级
+
+1. **任务级(最常用)**:prompt/任务书里写 `think` / `think hard` / `ultrathink` 关键词,
+   Claude Code 映射成 thinking 预算,litellm 再翻译给各厂商(ds→thinking 开关,gpt→reasoning effort)。
+2. **会话级**:交互终端 Tab 键切 thinking;或启动时设 `MAX_THINKING_TOKENS` 环境变量。
+3. **profile 级(生产)**:config/claude-profiles/profiles.json 加 `max_thinking_tokens` 字段(dispatch 已支持)。
+
+⚠️ 例外:ds-chat 在 litellm 层 pin 死 thinking disabled(对齐旧 deepseek-chat 语义),对它写 ultrathink 无效;
+需要推理就用 ds-reasoner(digester 缺省)或升难度档。
+
+## 协作机制:DAG 过队列,不搞 agent 对话
+
+worker 间禁对话(宪法),协作=依赖边:enqueue --depends-on 或 bridge/concierge 拆解时 depends_idx。
+上游 done → 下游自动触发,dispatch 会把上游产出路径+hash 继承要求注入下游 spec(dep_preprocess)。
+标准研究流水线:retriever(ds-chat 抓取初筛) → digester(ds-reasoner 深度分析) [→ auditor(qwen 交叉核验)]。
+
 ## 判断层档位(roles.md)
 
 Architect 日常 Sonnet、重决策切 Opus;Strategist battle 用 Sonnet 跑量+Opus 裁决;≤5 轮硬上限。

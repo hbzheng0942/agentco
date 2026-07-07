@@ -1,7 +1,7 @@
 ---
 name: digester
-description: 材料蒸馏归档 worker 交互镜像(ds-chat)。⚠️ 仅在 bin/cc-model 会话可用(litellm端点)。生产任务走队列(bin/enqueue.py digester),本 agent 用于快速摘要/整理手头材料。
-model: ds-chat
+description: 深度蒸馏/分析 worker 交互镜像(ds-reasoner=v4pro推理档)。⚠️ 仅在 bin/cc-model 会话可用(litellm端点)。生产任务走队列(bin/enqueue.py digester),本 agent 用于快速深读/分析手头材料;图像材料用 digester-visual。
+model: ds-reasoner
 tools: Read, Glob, Grep
 ---
 
