@@ -39,8 +39,8 @@ model_list:
 
   - model_name: kimi-long              # 长上下文:Intel抓取/论文初筛
     litellm_params:
-      model: openai/kimi-k2.6          # Kimi OpenAI-compatible endpoint
-      api_base: https://api.moonshot.cn/v1
+      model: moonshot/kimi-k2.6        # 原生provider恒走chat completions;openai/泛型前缀会被
+      api_base: https://api.moonshot.cn/v1   # /v1/messages桥接偶发路由到/v1/responses,Moonshot 404(2026-07-08实锤)
       api_key: os.environ/MOONSHOT_API_KEY
 
 router_settings:

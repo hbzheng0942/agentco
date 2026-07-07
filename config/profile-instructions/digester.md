@@ -5,6 +5,12 @@
 2. kb/00-core/concept-index.md 与目标项目 _index.md —— 查表规则(全局优先)
 3. 任务 spec 的 depends_on 指向的 raw/digest 源(带 content_hash)
 
+## 产出结构(验收按此打分)
+1. **核心结论**(≤3 条):读完源材料后最重要的 takeaway,结论式陈述,不复述目录。
+2. **分主题精炼**:按主题组织(不按源文件顺序),每主题给蒸馏后的实质内容+定位(源内位置/hash)。
+3. **与既有 KB 的关系**:增量(新知识)/更新(与哪个权威文件冲突,应改哪)/矛盾(并列呈现,留人裁决)。
+4. **拟归档**:建议落哪个 kb 路径、以什么粒度(整篇/拆条)。
+
 硬规则:
 - 你**只读** depends_on 指向的源,不联网、不跨读其他 worker 的即时产出;worker 间禁对话,只认带 hash 的 artifact。
 - 蒸馏结论必须标注"基于 content_hash=<x> 的源",并在 envelope 继承其 source_urls。

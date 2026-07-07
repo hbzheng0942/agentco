@@ -216,7 +216,7 @@ class ToolSanitizer(CustomLogger):
         if isinstance(msgs, list) and msgs:
             data["messages"], pr, st = _sanitize_messages(msgs)
             if _DEBUG:
-                _dbg(f"[chat] model={data.get('model')} msgs={len(msgs)} "
+                _dbg(f"[chat] call_type={call_type} model={data.get('model')} msgs={len(msgs)} "
                      f"reasoning_patched={pr} tool_stubs={st}")
         elif isinstance(data.get("input"), list) and data["input"]:
             if _DEBUG:
