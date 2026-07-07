@@ -69,7 +69,7 @@ def t_search():
     search._http = fake
     r = fresh_root(); search.ROOT = r
     with_root(r); import agentlib; agentlib.ROOT = r; search.load_env = lambda: None
-    path = search.run_search("news 测试", project="p")
+    path = search.run_search("news 测试", project="p", sources=[])
     txt = (r / path).read_text()
     check("search: 四路含两 news endpoint 都 ok",
           all(f"{x}: ok(2)" in txt for x in ("brave_web", "brave_news", "serper_web", "serper_news")))
@@ -78,7 +78,7 @@ def t_search():
     check("search: frontmatter 带 content_hash + source_urls",
           re.search(r"content_hash: \w+", txt) and "source_urls:" in txt)
     # 双语多 query:8 路记账带语言标签,sources 仍纯路由名(跨语聚合去重)
-    p2 = search.run_search(["news 测试", "news test"], project="p")
+    p2 = search.run_search(["news 测试", "news test"], project="p", sources=[])
     t2 = (r / p2).read_text()
     check("search: 双语8路记账+跨语聚合",
           "brave_web[zh0]: ok(2)" in t2 and "brave_web[en1]: ok(2)" in t2

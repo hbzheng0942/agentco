@@ -64,7 +64,7 @@ def default_difficulty(agent):
 
 def enqueue(agent, title, body, ttl=900, notify=1, spec_path=None,
             project="default", priority=2, depends_on=None, query=None,
-            difficulty=None):
+            difficulty=None, sources=None):
     difficulty = difficulty or default_difficulty(agent)
     if difficulty not in DIFFICULTY:
         raise ValueError(f"difficulty 须为 {'/'.join(DIFFICULTY)},得到 {difficulty!r}")
@@ -90,6 +90,8 @@ def enqueue(agent, title, body, ttl=900, notify=1, spec_path=None,
         sp.parent.mkdir(parents=True, exist_ok=True)
         qs = ([query] if isinstance(query, str) else list(query)) if query else []
         qline = "".join(f"query: {q}\n" for q in qs if q and str(q).strip())
+        if sources:
+            qline += f"sources: {','.join(sources) if isinstance(sources, (list, tuple)) else sources}\n"
         sp.write_text(f"""---
 id: {tid}
 agent: {agent}

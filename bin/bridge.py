@@ -40,8 +40,9 @@ dispatch 时输出 tasks(≤5 个),每项:
 {"agent": "...", "title": "≤30字标题", "body": "给 worker 的完整任务书:目标、验收要点、边界(不做什么)",
  "difficulty": "light|medium|heavy"(缺省:executor 用 medium,其余 light;超长材料/多模态才 heavy),
  "project": "default 或用户点名的项目", "depends_idx": null 或依赖的本次任务序号(0起),
- "query_zh": "仅 retriever:中文检索关键词(剥掉'请调研''输出报告'类指令噪声)",
- "query_en": "仅 retriever:英文检索关键词,全球性主题必填"}
+ "queries": ["仅 retriever:2-4条聚焦子query,每条≤6关键词、单一意图(禁止把多个面塞进一条长query);中英按主题配比,全球主题至少1条英文"],
+ "sources": ["仅 retriever,可选:github/reddit/hn/x/xiaohongshu/wechat——任务点名了哪些平台就列哪些;不列=缺省(通用+github+reddit+hn)"]}
+query 拆解示例:"搜集Minecraft衍生项目和社区需求"→ queries:["Minecraft mods framework popular","Minecraft server tools plugin","Minecraft education AI generation","我的世界 模组 工具 需求"],sources:["github","reddit"]
 status/cancel 时输出 task_ref: "T-YYYYMMDD-NNN" 或 null(用户没给明确 ID)。
 另输出 note: 一句话说明你的理解(给用户看的回执)。
 
@@ -89,18 +90,26 @@ def validate_plan(plan):
             diff = None                      # 交给 agentlib 缺省规则
         dep = t.get("depends_idx")
         dep = dep if isinstance(dep, int) and 0 <= dep < i else None
-        queries = []
+        queries, srcs = [], None
         if agent == "retriever":
-            for k in ("query_en", "query_zh"):   # en 在前:全球覆盖优先
+            qs = t.get("queries")
+            if isinstance(qs, list):             # 新式:多聚焦子query(≤4)
+                queries = [str(q).strip()[:120] for q in qs if str(q).strip()][:4]
+            for k in ("query_en", "query_zh"):   # 旧式兼容;en 在前:全球覆盖优先
                 q = str(t.get(k) or "").strip()
-                if q:
+                if q and q[:120] not in queries:
                     queries.append(q[:120])
+            queries = queries[:4]
             if not queries:
                 queries = [str(t.get("title") or body)[:100]]
+            raw_srcs = t.get("sources")
+            if isinstance(raw_srcs, list):       # 白名单过滤,非法源静默丢弃
+                srcs = [s for s in (str(x).strip().lower() for x in raw_srcs)
+                        if s in ("github", "reddit", "hn", "x", "xiaohongshu", "wechat")][:6] or None
         out["tasks"].append({"agent": agent, "title": str(t.get("title") or body)[:40],
                              "body": body[:4000], "difficulty": diff,
                              "project": re.sub(r"[^\w\-]", "", str(t.get("project") or "default"))[:40] or "default",
-                             "depends_idx": dep, "queries": queries})
+                             "depends_idx": dep, "queries": queries, "sources": srcs})
     return out if out["tasks"] else None
 
 
@@ -133,7 +142,8 @@ def execute_plan(plan):
     for t in plan["tasks"]:
         dep = tids[t["depends_idx"]] if t["depends_idx"] is not None else None
         tid = enqueue(t["agent"], t["title"], t["body"], project=t["project"],
-                      depends_on=dep, query=t["queries"] or None, difficulty=t["difficulty"])
+                      depends_on=dep, query=t["queries"] or None, difficulty=t["difficulty"],
+                      sources=t.get("sources"))
         tids.append(tid)
     return f"📥 已入队 {len(tids)} 个任务\n{plan_summary(plan, tids)}" + \
            (f"\n💬 {plan['note']}" if plan["note"] else "")

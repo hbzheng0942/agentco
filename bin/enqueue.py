@@ -14,7 +14,8 @@ p.add_argument("--silent", action="store_true")
 p.add_argument("--project", default="default")
 p.add_argument("--priority", type=int, default=2)
 p.add_argument("--depends-on", dest="depends_on")
-p.add_argument("--query")
+p.add_argument("--query", action="append", help="可重复:多聚焦子query")
+p.add_argument("--sources", help="逗号分隔:github,reddit,hn,x,xiaohongshu,wechat")
 p.add_argument("--difficulty", choices=["light", "medium", "heavy"],
                help="难度档→模型路由;缺省 executor=medium(GPT),其余 light")
 p.add_argument("--body")
@@ -27,4 +28,5 @@ else:
     body = sys.stdin.read().strip() or a.title
 print(enqueue(a.agent, a.title, body, a.ttl, 0 if a.silent else 1, a.spec,
               project=a.project, priority=a.priority, depends_on=a.depends_on, query=a.query,
-              difficulty=a.difficulty))
+              difficulty=a.difficulty,
+              sources=[s.strip() for s in a.sources.split(",") if s.strip()] if a.sources else None))

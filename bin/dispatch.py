@@ -145,15 +145,17 @@ def canonical_envelope(t, profile, urls, chash, artifacts):
 
 # ---- retriever 预处理:跑 search.py,把 raw 路径注入上下文 ----
 def search_preprocess(db, t, spec):
-    # query 行可多条(bridge 生成双语:query: / query_en: / query_zh: 都认)
+    # query 行可多条(query: / query_en: / query_zh: / query_2: 都认,鼓励多聚焦子query)
     queries = [q.strip().strip('"').strip("'")
-               for q in re.findall(r"^query(?:_[a-z]+)?:\s*(.+?)\s*$", spec, re.M) if q.strip()]
+               for q in re.findall(r"^query(?:_[a-z0-9]+)?:\s*(.+?)\s*$", spec, re.M) if q.strip()]
     if not queries:
         log(f"{t['id']} retriever 无 query 字段,跳过搜索预处理")
         return spec
+    m = re.search(r"^sources:\s*(.+)$", spec, re.M)   # 垂直/站内路由(github,reddit,hn,x,xiaohongshu,wechat)
+    srcs = [s.strip() for s in m.group(1).split(",") if s.strip()] if m else None
     try:
         from search import run_search
-        raw = run_search(queries, project=t["project"] or "default")
+        raw = run_search(queries, project=t["project"] or "default", sources=srcs)
         ev(db, t["id"], t["agent"], "search", raw)
         log(f"{t['id']} search.py → {raw}")
         return (f"# 已抓取搜索原料(只读它分析,禁止联网)\n路径:{raw}\n"

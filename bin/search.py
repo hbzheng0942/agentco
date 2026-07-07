@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """search.py — dispatcher 层搜索(REST 直调,零 MCP,stdlib only)。
 
-四路并行:Brave web + Brave news + Serper web + Serper news,各取 top10。
-加权去重:URL 归一化 → 同 URL 跨路叠加 1/(rank+1) → 按总分降序取 top12。
+路由分三层(2026-07-08 扩展,Minecraft任务实锤通用SERP覆盖不了垂直社区):
+- 核心四路(恒开):Brave web/news + Serper web/news
+- 免费垂直(缺省开):github(API,按star)/ reddit(公开JSON,按热度)/ hn(Algolia)
+- 定向站内(opt-in,吃 Serper 配额+Google索引):x / xiaohongshu / wechat(site:限定)
+加权去重:URL 归一化 → 同 URL 跨路叠加 1/(rank+1) → 按总分降序取 topN。
 产物:kb/30-projects/<proj>/raw/search-<slug>-<date>.md,frontmatter 带
 content_hash / source_urls / query / fetch_ts / routes 状态(单路失败不阻断,记入产物)。
 
-CLI:  search.py --project <proj> --query "<q>" [--topn 12]  → 打印产物相对路径
-API:  from search import run_search; path = run_search(query, project)
+CLI:  search.py --project <proj> --query "<q>" [--query "<q2>"...] [--sources github,reddit,x] [--topn N]
+API:  from search import run_search; path = run_search(queries, project, sources=[...])
 """
 import argparse, concurrent.futures as cf, hashlib, json, os, re, sys, urllib.parse, urllib.request
 from datetime import datetime, timezone
@@ -93,12 +96,84 @@ def serper(kind, query):
     return out
 
 
-ROUTES = {
+def github_repos(query):
+    """GitHub 仓库搜索(按 star 降序)。无 key 可用(10req/min);GITHUB_TOKEN 可选提额。
+    热度(⭐/语言/最近推送)写进 title,retriever 蒸馏时可直接引用。"""
+    hdr = {"Accept": "application/vnd.github+json", "User-Agent": "agentco-search"}
+    tok = os.environ.get("GITHUB_TOKEN", "")
+    if tok:
+        hdr["Authorization"] = f"Bearer {tok}"
+    def _q(q):
+        url = ("https://api.github.com/search/repositories?"
+               + urllib.parse.urlencode({"q": q, "sort": "stars", "order": "desc",
+                                         "per_page": TOPN_PER_ROUTE}))
+        return _http("GET", url, hdr).get("items") or []
+    items = _q(query)
+    if not items:   # GitHub 是全词匹配,"trending/popular"类修饰词会清零;缩到前2个实词重试
+        words = [w for w in re.split(r"\s+", query)
+                 if w.lower() not in ("trending", "popular", "best", "top", "awesome", "latest")]
+        if len(words) >= 2:
+            items = _q(" ".join(words[:2]))
+    return [(it["html_url"],
+             f"{it['full_name']} ⭐{it['stargazers_count']}",
+             f"{(it.get('description') or '').strip()} | lang:{it.get('language')} "
+             f"updated:{(it.get('pushed_at') or '')[:10]}")
+            for it in items[:TOPN_PER_ROUTE]]
+
+
+def reddit(query):
+    """Reddit 公开搜索 JSON(免 key,带▲热度);数据中心 IP 常被 403(腾讯云实锤 2026-07-08),
+    自动降级 serper site:reddit.com(吃 Google 索引,丢热度但保话题覆盖)。"""
+    try:
+        url = ("https://www.reddit.com/search.json?"
+               + urllib.parse.urlencode({"q": query, "sort": "relevance", "t": "year",
+                                         "limit": TOPN_PER_ROUTE}))
+        data = _http("GET", url, {"User-Agent": "agentco-search/1.0 (research bot)"})
+        posts = [c.get("data", {}) for c in data.get("data", {}).get("children", [])]
+        return [("https://www.reddit.com" + p["permalink"],
+                 f"[r/{p.get('subreddit')}] {p.get('title')} (▲{p.get('score')} · {p.get('num_comments')}评论)",
+                 (p.get("selftext") or "")[:220])
+                for p in posts[:TOPN_PER_ROUTE] if p.get("permalink")]
+    except Exception:
+        return [(u, f"[reddit] {t}", s) for u, t, s in serper("web", f"site:reddit.com {query}")]
+
+
+def hackernews(query):
+    """Hacker News Algolia 搜索(免 key)。"""
+    url = ("https://hn.algolia.com/api/v1/search?"
+           + urllib.parse.urlencode({"query": query, "tags": "story",
+                                     "hitsPerPage": TOPN_PER_ROUTE}))
+    hits = _http("GET", url, {"User-Agent": "agentco-search"}).get("hits") or []
+    out = []
+    for h in hits[:TOPN_PER_ROUTE]:
+        u = h.get("url") or f"https://news.ycombinator.com/item?id={h.get('objectID')}"
+        out.append((u, f"[HN] {h.get('title')} (▲{h.get('points')} · {h.get('num_comments')}评论)",
+                    (h.get("story_text") or "")[:200]))
+    return out
+
+
+def _serper_site(domain):
+    """定向站内搜索(吃 Google 索引,Serper 配额):x/小红书/公众号无官方免费API,索引覆盖有限但零风险。"""
+    return lambda q: serper("web", f"site:{domain} {q}")
+
+
+ROUTES = {  # 核心四路,恒开
     "brave_web":   lambda q: brave("web", q),
     "brave_news":  lambda q: brave("news", q),
     "serper_web":  lambda q: serper("web", q),
     "serper_news": lambda q: serper("news", q),
 }
+FREE_VERTICAL = {  # 免费垂直,缺省开(sources 显式给出时以 sources 为准)
+    "github": github_repos,
+    "reddit": reddit,
+    "hn":     hackernews,
+}
+SITE_ROUTES = {  # 定向站内,仅 sources 点名才开
+    "x":           _serper_site("x.com"),
+    "xiaohongshu": _serper_site("xiaohongshu.com"),
+    "wechat":      _serper_site("mp.weixin.qq.com"),
+}
+VALID_SOURCES = set(FREE_VERTICAL) | set(SITE_ROUTES)
 
 
 def _slug(s):
@@ -106,19 +181,27 @@ def _slug(s):
     return (s[:40] or "q").rstrip("-")
 
 
-def run_search(query, project="default", topn=None):
-    """query: str 或 [str,...](双语多路:每个 query 各跑四路,跨路跨语加权去重)。"""
+def run_search(query, project="default", topn=None, sources=None):
+    """query: str 或 [str,...](多聚焦子query:每个各跑活跃路由,跨路跨语加权去重)。
+    sources: None=核心四路+免费垂直(github/reddit/hn);
+             [str,...]=核心四路+点名的垂直/站内路由(x/xiaohongshu/wechat 只能点名开)。"""
     queries = [query] if isinstance(query, str) else [q for q in query if q and q.strip()]
     if not queries:
         raise ValueError("query 为空")
-    if topn is None:
-        topn = min(20, TOPN_FINAL + 4*(len(queries)-1))   # 多 query 适度放宽名额
+    if sources is None:
+        extra = dict(FREE_VERTICAL)
+    else:
+        extra = {s: (FREE_VERTICAL.get(s) or SITE_ROUTES.get(s))
+                 for s in sources if s in VALID_SOURCES}
+    active = {**ROUTES, **{k: v for k, v in extra.items() if v}}
+    if topn is None:   # 多 query/多路由适度放宽名额
+        topn = min(30, TOPN_FINAL + 4*(len(queries)-1) + 2*len(extra))
     fetch_ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
     route_status, agg = {}, {}  # norm_url -> {url,title,snippet,sources:set,score}
     # label 记账带语言标签(多query时);sources 恒用纯路由名,保证跨语去重聚合
     jobs = {}
     for i, q in enumerate(queries):
-        for name, fn in ROUTES.items():
+        for name, fn in active.items():
             label = name if len(queries) == 1 else f"{name}[{_lang(q)}{i}]"
             jobs[label] = (name, fn, q)
     with cf.ThreadPoolExecutor(max_workers=min(8, len(jobs))) as ex:
@@ -165,9 +248,10 @@ def run_search(query, project="default", topn=None):
     for e in ranked:
         lines.append(f"  - {e['url']}")
     lines += ["---", "", f"# 搜索原料:{' / '.join(queries)}", "",
-              f"> 四路并行(brave web/news + serper web/news)×{len(queries)} query,加权去重后 top{len(ranked)}。"
+              f"> {len(active)}路并行({'+'.join(sorted(active))})×{len(queries)} query,加权去重后 top{len(ranked)}。"
               f"单路失败见 frontmatter.routes。模型只读本文件,不得联网;"
-              f"蒸馏时必须评估语言/地域覆盖面(frontmatter 的 queries 与 routes)。", ""]
+              f"蒸馏时必须评估语言/地域/平台覆盖面(frontmatter 的 queries 与 routes);"
+              f"github/reddit/hn 条目 title 内嵌热度(⭐/▲/评论数),蒸馏时引用。", ""]
     for i, e in enumerate(ranked, 1):
         lines.append(f"## {i}. {e['title'] or '(无标题)'}")
         lines.append(f"- url: {e['url']}")
@@ -182,7 +266,10 @@ def run_search(query, project="default", topn=None):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--project", default="default")
-    ap.add_argument("--query", required=True, action="append", help="可重复传入(双语多query)")
+    ap.add_argument("--query", required=True, action="append", help="可重复传入(多聚焦子query)")
     ap.add_argument("--topn", type=int, default=None)
+    ap.add_argument("--sources", default=None,
+                    help=f"逗号分隔:{','.join(sorted(VALID_SOURCES))}(缺省=github,reddit,hn)")
     a = ap.parse_args()
-    print(run_search(a.query, a.project, a.topn))
+    srcs = [s.strip() for s in a.sources.split(",") if s.strip()] if a.sources else None
+    print(run_search(a.query, a.project, a.topn, sources=srcs))
