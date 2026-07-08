@@ -22,6 +22,8 @@ source_urls:
   - https://link.springer.com/article/10.1007/s10462-025-11430-4
   - https://openaccess.thecvf.com/content/ICCV2023/papers/Liu_PARIS_Part-level_Reconstruction_and_Motion_Analysis_for_Articulated_Objects_ICCV_2023_paper.pdf
   - https://arxiv.org/pdf/2410.13882
+scope: project
+tier: ephemeral
 ---
 
 # 搜索原料:multimodal object part structure understanding articulated object joint motion part mobility papers GitHub 2021 2022 2023 2024 2025

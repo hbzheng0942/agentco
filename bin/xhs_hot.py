@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""xhs_hot.py — 小红书每日热点追踪(关键词监控 + 日间趋势检测,分 AI/非 AI 两线)。
+"""xhs_hot.py — 小红书每日热点追踪(关键词监控 + 发布日期 freshness gate,分 AI/非 AI 两线)。
 
 借 RedSkill 的 xiaohongshu-cn 方法(热门笔记发现/关键词监控/趋势分析)。
 弃用旧版"首页第一屏"(个性化推荐流样本小且偏,不代表全站热点)。
 
 方法(两线各用对路的信号):
-- AI 线:关键词 watchlist(config/xhs_watchlist.json)→ 每词 search_feeds → 汇总去重。精准盯我们的域。
-- 非 AI 线:多次拉 list_feeds(explore 流)去重 + 少量种子词补充 → 通用大盘脉搏。
-- 趋势检测(核心):存昨日各线 note id(data/xhs_hot_state/),今日标出**新冒头**(🆕)——
-  日间新增的高互动笔记才是"趋势",不是高赞存量。按互动降序、新冒头优先。
+- AI 线:关键词 watchlist(config/xhs_watchlist.json)→ 优先 search_feeds filters(近窗+最多点赞)→ 失败回退裸搜。
+- 非 AI 线:种子词同样 filter-first,并剔除 AI 类标题。
+- freshness 判断(核心):逐笔 get_feed_detail 读取 note.time,只保留近 window 天发布的高互动笔记。
+  "今日新出现 id"只能做辅助趋势信号,不能替代发布日期 freshness 判据。
 
 确定性采集,无 LLM。依赖 xiaohongshu-mcp(:18060,systemd 常驻)。
 
@@ -24,8 +24,8 @@ from agentlib import ROOT
 from xhs_search import _MCP, _int, _note_url, note_date, restart_mcp
 
 WATCHLIST = ROOT / "config/xhs_watchlist.json"
-STATE_DIR = ROOT / "data/xhs_hot_state"
 DETAIL_TIMEOUT = 90       # 单笔 detail/search 上限;超时判卡死触发看门狗
+FILTER_TIMEOUT = 45       # filter UI 更易卡,短超时后立即回退裸搜+detail gate
 DEFAULT_WINDOW = 7        # 默认只看近 7 天发布(daily 热度口径:一周内)
 CANDIDATE_CAP = 14        # 每线逐笔 detail 的候选上限(detail 慢,须克制)
 AI_KW = re.compile(
@@ -51,21 +51,80 @@ def _card(f):
     }
 
 
-def _collect(mcp, keywords, drop_ai):
-    """基础 search_feeds(能用;filter 版会卡浏览器,弃用)汇总候选去重。
-    drop_ai=True 时剔除 AI 类(非 AI 线用)。返回候选卡片列表。"""
+def _publish_time_for_window(window_days):
+    if window_days <= 1:
+        return "一天内"
+    if window_days <= 7:
+        return "一周内"
+    return "半年内"
+
+
+def _feeds_from_raw(res):
+    return (res or {}).get("feeds", []) if isinstance(res, dict) else []
+
+
+def _collect(mcp, keywords, drop_ai, publish_time="一周内", sort_by="最多点赞"):
+    """filter-first 搜索候选,失败/空返回退裸 search_feeds。
+    publish_time/sort_by 只用于降低候选污染;真实 freshness 仍由 detail note.time 验证。
+    返回 (候选卡片列表, 搜索统计, 可能重连后的 mcp)。"""
     seen, notes = set(), []
-    for kw in keywords:
-        try:
-            res = mcp.call("search_feeds", {"keyword": kw}, timeout=DETAIL_TIMEOUT)
-        except Exception:
-            continue
-        for f in (res or {}).get("feeds", []) if isinstance(res, dict) else []:
+    stats = {
+        "keywords": len(keywords),
+        "filter_publish_time": publish_time,
+        "filter_sort_by": sort_by,
+        "filtered_ok": 0,
+        "filter_empty": 0,
+        "filter_failed": 0,
+        "fallback_ok": 0,
+        "fallback_empty": 0,
+        "fallback_failed": 0,
+        "mcp_restarts": 0,
+    }
+
+    def add(feeds, via, freshness_source):
+        added = 0
+        for f in feeds:
             k = f.get("id")
             title = (f.get("noteCard", {}) or {}).get("displayTitle", "")
             if k and k not in seen and not (drop_ai and AI_KW.search(title)):
-                seen.add(k); c = _card(f); c["via"] = f"kw:{kw}"; notes.append(c)
-    return notes
+                seen.add(k)
+                c = _card(f)
+                c["via"] = via
+                c["freshness_source"] = freshness_source
+                notes.append(c)
+                added += 1
+        return added
+
+    for kw in keywords:
+        try:
+            feeds = mcp.search(kw, publish_time=publish_time, sort_by=sort_by, timeout=FILTER_TIMEOUT)
+            if feeds:
+                stats["filtered_ok"] += 1
+                add(feeds, f"kw:{kw}|filter:{publish_time}/{sort_by}", "filtered_search")
+                continue
+            stats["filter_empty"] += 1
+        except Exception:
+            stats["filter_failed"] += 1
+            if restart_mcp():
+                stats["mcp_restarts"] += 1
+                try:
+                    mcp = _MCP()
+                except Exception:
+                    pass
+
+        try:
+            res = mcp.call("search_feeds", {"keyword": kw}, timeout=DETAIL_TIMEOUT)
+            feeds = _feeds_from_raw(res)
+            if feeds:
+                stats["fallback_ok"] += 1
+                add(feeds, f"kw:{kw}|fallback:裸搜", "fallback_search")
+            else:
+                stats["fallback_empty"] += 1
+        except Exception:
+            stats["fallback_failed"] += 1
+
+    stats["candidates_collected"] = len(notes)
+    return notes, stats, mcp
 
 
 class _Session:
@@ -114,7 +173,14 @@ def _detail_gate(sess, cands, window_days, cap):
         else:
             stale += 1
     fresh.sort(key=lambda n: n["likes"], reverse=True)
-    return fresh, {"stale_dropped": stale, "undated_skipped": undated, "cutoff": cutoff}
+    return fresh, {
+        "stale_dropped": stale,
+        "undated_skipped": undated,
+        "cutoff": cutoff,
+        "window_days": window_days,
+        "candidates_detail_checked": len(cands),
+        "fresh_kept": len(fresh),
+    }
 
 
 def _fmt(notes):
@@ -153,7 +219,8 @@ def _write(line, urls, body, project, window, stats):
     out = raw_dir / f"{datetime.now():%Y-%m-%d}-{line}.md"
     lines = ["---", "kind: community_raw", "tier: ephemeral", "scope: area", "area: xhs-hot",
              "platform: xiaohongshu", f"line: {line}",
-             f"topic: 小红书每日热点-{zh}线", f"method: 关键词监控+发布日期freshness门(近{window}天)",
+             f"topic: 小红书每日热点-{zh}线",
+             f"method: filter-first({stats.get('filter_publish_time','?')}+{stats.get('filter_sort_by','?')})+发布日期freshness门(近{window}天)",
              f"window_days: {window}", f"freshness_stats: {json.dumps(stats, ensure_ascii=False)}",
              f"fetch_ts: {datetime.now(timezone.utc).isoformat(timespec='seconds')}",
              f"content_hash: {chash}", f"project: {project}", "topics: [小红书热点, AI市场, 用户原声]",
@@ -161,10 +228,12 @@ def _write(line, urls, body, project, window, stats):
     lines += [f"  - {u}" for u in urls] or ["  []"]
     lines += ["---", "",
               f"# 小红书每日热点 · {zh}线 · {datetime.now():%Y-%m-%d}(近{window}天发布)", "",
-              f"> **口径:只收近 {window} 天发布的高互动笔记**(存量老帖已按发布日期过滤,"
-              f"本批丢弃 {stats.get('stale_dropped',0)} 篇过期、{stats.get('undated_skipped',0)} 篇无日期)。"
-              f"digester 蒸馏:①今日该线新热话题聚类(3-5簇,每簇so-what);②营销号刷量甄别;"
-              f"③对我们(具身/仿真/空间智能)值得关注的。原声回指具体评论。",
+              f"> **口径:每个关键词优先用 publish_time={stats.get('filter_publish_time','?')} + "
+              f"sort_by={stats.get('filter_sort_by','?')} 搜索,再用详情页发布日期二次验证**;"
+              f"存量老帖已按 note.time 过滤,本批丢弃 {stats.get('stale_dropped',0)} 篇过期、"
+              f"{stats.get('undated_skipped',0)} 篇无日期。filter 失败 {stats.get('filter_failed',0)} 次、"
+              f"fallback 成功 {stats.get('fallback_ok',0)} 次。digester 蒸馏:①今日该线新热话题聚类(3-5簇,每簇so-what);"
+              f"②营销号刷量甄别;③对我们(具身/仿真/空间智能)值得关注的。原声回指具体评论。",
               "", body]
     out.write_text("\n".join(lines))
     return str(out.relative_to(ROOT))
@@ -175,11 +244,16 @@ def run_xhs_hot(project="default", top=10, window=DEFAULT_WINDOW, cap=CANDIDATE_
     mcp = _MCP()
     if "已登录" not in str(mcp.call("check_login_status", {})):
         raise RuntimeError("xiaohongshu-mcp 未登录")
-    ai_cands = _collect(mcp, wl.get("ai", []), drop_ai=False)
-    non_cands = _collect(mcp, wl.get("nonai_seed", []), drop_ai=True)
+    publish_time = _publish_time_for_window(window)
+    ai_cands, ai_collect_stats, mcp = _collect(mcp, wl.get("ai", []), drop_ai=False,
+                                               publish_time=publish_time, sort_by="最多点赞")
+    non_cands, non_collect_stats, mcp = _collect(mcp, wl.get("nonai_seed", []), drop_ai=True,
+                                                 publish_time=publish_time, sort_by="最多点赞")
     sess = _Session(mcp)   # 逐笔 detail 拿发布日期+评论,freshness 门
-    ai_fresh, ai_stats = _detail_gate(sess, ai_cands, window, cap)
-    non_fresh, non_stats = _detail_gate(sess, non_cands, window, cap)
+    ai_fresh, ai_gate_stats = _detail_gate(sess, ai_cands, window, cap)
+    non_fresh, non_gate_stats = _detail_gate(sess, non_cands, window, cap)
+    ai_stats = {**ai_collect_stats, **ai_gate_stats}
+    non_stats = {**non_collect_stats, **non_gate_stats}
     ai_urls, ai_body = _fmt(ai_fresh[:top])
     non_urls, non_body = _fmt(non_fresh[:top])
     ai_path = _write("ai", ai_urls, ai_body or f"> 近 {window} 天 AI 线无新热笔记。", project, window, ai_stats)

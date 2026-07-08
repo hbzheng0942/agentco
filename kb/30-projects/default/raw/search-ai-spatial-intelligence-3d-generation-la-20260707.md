@@ -23,6 +23,8 @@ source_urls:
   - https://thedeepview.com/newsletter/how-world-models-became-ai-s-next-frontier
   - https://www.prnewswire.com/news-releases/hesai-unveils-picasso-6d-full-color-spad-soc-next-gen-etx-and-innovations-in-spatial-intelligence-and-physical-ai-302747260.html
   - https://finance.yahoo.com/news/tripo-powers-next-generation-3d-110000362.html
+scope: project
+tier: ephemeral
 ---
 
 # 搜索原料:AI spatial intelligence 3D generation latest news

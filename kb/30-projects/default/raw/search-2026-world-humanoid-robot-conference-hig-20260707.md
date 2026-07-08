@@ -23,6 +23,8 @@ source_urls:
   - https://qviro.com/blog/humanoid-robot-trade-shows-2026/
   - https://www.cnbc.com/2026/03/04/xiaomi-humanoid-robots-ev-factory-.html
   - https://expolume.com/expo/world-robot-conference-and-expo/
+scope: project
+tier: ephemeral
 ---
 
 # 搜索原料:2026 world humanoid robot conference highlights

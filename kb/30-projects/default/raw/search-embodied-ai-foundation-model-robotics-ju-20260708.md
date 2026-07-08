@@ -23,6 +23,8 @@ source_urls:
   - https://dtsbourg.me/en/articles/predictions-embodied-ai
   - https://colours-alliance.eu/events/foundational-models-meet-robotics-from-language-and-vision-to-action/
   - https://gulfnews.com/technology/why-investors-are-betting-billions-on-x-square-robots-embodied-ai-vision-1.500595720
+scope: project
+tier: ephemeral
 ---
 
 # 搜索原料:embodied AI foundation model robotics July 2026

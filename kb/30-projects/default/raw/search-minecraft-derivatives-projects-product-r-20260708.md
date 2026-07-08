@@ -32,6 +32,8 @@ source_urls:
   - https://github.blog/enterprise-software/governance-and-compliance/how-github-maintains-compliance-for-open-source-dependencies
   - https://github.com/AdityaGupta1/minecraft-modding-workshop-code
   - https://github.com/MinecraftModDevelopmentMods
+scope: project
+tier: ephemeral
 ---
 
 # 搜索原料:Minecraft derivatives projects product requirements GitHub community worldwide / Minecraft我的世界衍生产品项目需求GitHub社区

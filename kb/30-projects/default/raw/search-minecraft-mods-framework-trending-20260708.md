@@ -68,6 +68,8 @@ source_urls:
   - https://modrinth.com/mod/ai-player
   - https://modrinth.com/project/4RSNGDRJ
   - https://news.yxrb.net/2026/0618/7127.html
+scope: project
+tier: ephemeral
 ---
 
 # 搜索原料:Minecraft mods framework trending / Minecraft server tools admin plugin / Minecraft AI agent generation mod / 我的世界 模组 需求 社区

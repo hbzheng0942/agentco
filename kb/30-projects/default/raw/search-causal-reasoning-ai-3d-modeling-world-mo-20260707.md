@@ -32,6 +32,8 @@ source_urls:
   - https://news.qq.com/rain/a/20260630A05TDI00
   - https://zhuanlan.zhihu.com/p/2024999051473494594
   - https://zhuanlan.zhihu.com/p/670574382
+scope: project
+tier: ephemeral
 ---
 
 # 搜索原料:causal reasoning AI 3D modeling world model application progress / 因果推理 AI 3D建模 世界模型 应用 进展
