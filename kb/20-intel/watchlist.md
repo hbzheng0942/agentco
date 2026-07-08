@@ -1,3 +1,9 @@
+---
+scope: area
+tier: working
+topics: [intel]
+---
+
 # Watchlist v1(HB按需增删,Owl只读)
 
 ## 高优先级(每日事件扫描)

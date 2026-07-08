@@ -1,3 +1,8 @@
+---
+scope: core
+tier: canonical
+---
+
 # AGENTCO 宪法(Wave③ 追加)
 
 > 单一真相源级约束。修改需 HB 手动 commit。各 AGENT.md / dispatch / 索引均从此文件取权威定义。

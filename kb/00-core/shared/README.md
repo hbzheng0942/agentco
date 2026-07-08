@@ -1,3 +1,8 @@
+---
+scope: core
+tier: canonical
+---
+
 # 共享组件(结构预留,按需生长)
 
 每个共享组件一个目录:`kb/00-core/shared/<comp>/`,含:

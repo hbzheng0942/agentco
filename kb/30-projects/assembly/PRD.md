@@ -1,3 +1,9 @@
+---
+scope: project
+tier: working
+topics: [assembly]
+---
+
 # assembly PRD v0.3 — 仿真就绪的铰接 3D 资产生成
 
 > 版本:v0.3(2026-07-07)| 作者:CC(Architect)| 裁决人:HB

@@ -1,3 +1,8 @@
+---
+scope: core
+tier: canonical
+---
+
 # Warden 巡检清单(供 CC 开 Warden 会话喂入)
 
 > Warden = CC 的系统巡检 stance(非 codex worker)。定期开一个 CC 会话,按四维逐项核验,

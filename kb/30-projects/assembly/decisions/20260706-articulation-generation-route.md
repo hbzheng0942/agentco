@@ -1,3 +1,9 @@
+---
+scope: project
+tier: canonical
+topics: [assembly]
+---
+
 # 决策草案：关节/装配语义生成的技术路线
 
 > **状态:DRAFT — TO BE DECIDED(证据已齐,只欠 HB 落章)**

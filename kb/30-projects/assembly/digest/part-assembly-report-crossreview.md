@@ -1,3 +1,9 @@
+---
+scope: project
+tier: working
+topics: [assembly]
+---
+
 # DeepSeek 外部报告交叉审 — part-assembly-report.md
 
 > 日期:2026-07-07 | 审者:CC(Architect)| 源:`raw/part-assembly-report.md`(HB 自行投递 DeepSeek 产出)

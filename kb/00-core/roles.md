@@ -1,3 +1,8 @@
+---
+scope: core
+tier: canonical
+---
+
 # 判断层角色澄清(仅文档,不进 codex 队列)
 
 > 本文件界定 CC(判断层)与 codex worker(执行层)的分工,以及三审分离。

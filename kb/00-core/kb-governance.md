@@ -3,6 +3,7 @@ kind: governance
 tier: canonical
 topics: [知识治理, 文件生命周期, 存储规则]
 updated: 2026-07-08
+scope: core
 ---
 # AGENTCO 知识库治理规则(scope × tier × kind × 图谱底座)
 
@@ -28,9 +29,6 @@ updated: 2026-07-08
 - **周期性监测归 area**,且是**时间序列**:`kb/40-areas/xhs-hot/{raw,digest}/YYYY-MM-DD.md`,
   支持周/月 rollup 综述(`kb/40-areas/xhs-hot/rollup/2026-W28.md`),旧日报按 tier=ephemeral/working GC。
 - 项目完结 → 整个 `30-projects/<proj>/` 移入 `99-archive/`,不留在活跃区干扰。
-
-## 一、生命周期(tier)——决定留存与去向
-每个文件按 **类型(kind)× 生命周期分级(tier)** 治理,tier 决定存哪、留多久、是否上飞书。
 
 ## 一、三级生命周期(tier)——决定留存与去向
 

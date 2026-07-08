@@ -3,6 +3,7 @@ date: 2026-07-07
 scope: 系统级(全域)
 status: applied
 decider: HB(飞书拍板"一次性切了吧") + CC 执行
+tier: canonical
 ---
 
 # Wave④ 决策:worker 引擎 codex→Claude Code + 出入站体验重构

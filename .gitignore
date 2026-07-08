@@ -19,3 +19,5 @@ logs/.feishu_tenant_token.json
 vendor/xhs/
 vendor/fb/
 data/xhs_hot_state/
+state/feishu_folders.json
+state/kb_graph.json

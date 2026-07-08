@@ -1,3 +1,8 @@
+---
+scope: core
+tier: canonical
+---
+
 # 全局概念索引(single source of truth)
 
 > **查表顺序**:本表(全局)→ 各项目 `kb/30-projects/<proj>/_index.md`,**查到即停,全局优先**。
