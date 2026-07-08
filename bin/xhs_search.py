@@ -24,16 +24,39 @@ from agentlib import ROOT, load_env
 
 load_env()
 XHS_URL = os.environ.get("XHS_MCP_URL", "http://localhost:18060/mcp")
-HTTP_TIMEOUT = 180
+HTTP_TIMEOUT = 120   # 单调用上限;xiaohongshu-mcp 单浏览器慢调用会挂,宁可失败触发看门狗也不无限等
 _id = [10]
 
 
-def _post(body, sid=None):
+def note_date(note):
+    """从 get_feed_detail 的 note.time(epoch ms)取发布日期 YYYY-MM-DD;无则 None。
+    ⚠️ search_feeds 不返回时间,只有 detail 有——这是唯一可靠的发布日期来源。"""
+    import datetime
+    t = (note or {}).get("time")
+    try:
+        return datetime.datetime.fromtimestamp(int(t) / 1000).strftime("%Y-%m-%d") if t else None
+    except Exception:
+        return None
+
+
+def restart_mcp():
+    """看门狗:MCP 浏览器卡死时重启服务(登录态在 ./data 持久,不丢)。采集器超时后调用。"""
+    import subprocess, time
+    try:
+        subprocess.run(["sudo", "systemctl", "restart", "xiaohongshu-mcp.service"],
+                       check=False, timeout=30)
+        time.sleep(7)
+        return True
+    except Exception:
+        return False
+
+
+def _post(body, sid=None, timeout=None):
     h = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
     if sid:
         h["Mcp-Session-Id"] = sid
     req = urllib.request.Request(XHS_URL, data=json.dumps(body).encode(), headers=h, method="POST")
-    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
+    with urllib.request.urlopen(req, timeout=timeout or HTTP_TIMEOUT) as r:
         objs = []
         for line in r.read().decode().splitlines():
             line = line.strip()
@@ -58,11 +81,11 @@ class _MCP:
             raise RuntimeError(f"xiaohongshu-mcp 不可达({XHS_URL});服务是否在跑? {str(e)[:120]}")
         _post({"jsonrpc": "2.0", "method": "notifications/initialized"}, self.sid)
 
-    def call(self, name, args):
+    def call(self, name, args, timeout=None):
         _id[0] += 1
         i = _id[0]
         objs, _ = _post({"jsonrpc": "2.0", "method": "tools/call",
-                         "params": {"name": name, "arguments": args}, "id": i}, self.sid)
+                         "params": {"name": name, "arguments": args}, "id": i}, self.sid, timeout=timeout)
         for o in objs:
             if o.get("id") == i:
                 if o.get("error"):
@@ -76,6 +99,21 @@ class _MCP:
                         return txt   # 非 JSON(多为错误串,如 not found in noteDetailMap)
                 return o.get("result")
         return None
+
+    def search(self, keyword, publish_time=None, sort_by=None, timeout=None):
+        """search_feeds 便捷封装:publish_time(不限|一天内|一周内|半年内)+sort_by(综合|最新|最多点赞|...)。
+        ⚠️ 带 filters 的搜索驱动小红书筛选 UI,比裸搜慢很多且偶尔卡浏览器;调用方须配看门狗+回退。
+        返回 feeds 列表(异常/空返回 [])。"""
+        args = {"keyword": keyword}
+        f = {}
+        if publish_time and publish_time != "不限":
+            f["publish_time"] = publish_time
+        if sort_by and sort_by != "综合":
+            f["sort_by"] = sort_by
+        if f:
+            args["filters"] = f
+        r = self.call("search_feeds", args, timeout=timeout)
+        return (r or {}).get("feeds", []) if isinstance(r, dict) else []
 
 
 def _int(v):
@@ -131,6 +169,7 @@ def run_xhs_search(topic, project="default", notes=4):
         urls.append(u)
         sec = [f"## {note.get('title') or title}",
                f"- url: {u}",
+               f"- 发布日期: {note_date(note) or '(未知)'}",
                f"- 作者: {(note.get('user') or {}).get('nickname','?')} · ▲{ii.get('likedCount','?')}赞 · "
                f"{ii.get('commentCount','?')}评论 · {ii.get('collectedCount','?')}收藏 · IP:{note.get('ipLocation','?')}",
                f"- 笔记原声: {(note.get('desc') or '(仅图文无正文)').strip()}",

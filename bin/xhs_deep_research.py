@@ -18,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from agentlib import ROOT
-from xhs_search import _MCP, _int, _note_url, _slug
+from xhs_search import _MCP, _int, _note_url, _slug, note_date
 
 
 def _collect(mcp, queries):
@@ -60,6 +60,7 @@ def _deep_note(mcp, n, cmt_limit):
             note = d["data"].get("note", {}) or {}
             cl = sorted(((d["data"].get("comments") or {}).get("list")) or [],
                         key=lambda c: _int(c.get("likeCount")), reverse=True)
+            head.insert(3, f"- 发布日期: {note_date(note) or '(未知)'}")
             if note.get("desc"):
                 head.append(f"- 笔记原声: {note['desc'].strip()[:400]}")
             if cl:
