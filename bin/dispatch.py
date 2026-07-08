@@ -37,7 +37,8 @@ GAPS_MAX_ITEMS = 3         # 单次补抓/深潜最多取的缺口条目数,防 
 DEEPDIVE_SCRIPT = {        # 社区深潜采集脚本(文件存在=该路上线;未就位只记事件,不造死任务)
     "reddit": "bin/reddit_deep.py",       # ✅ ds-chat worker 驱动 reddit-research-mcp
     "x": "bin/x_search.py",               # ✅ twitter-cli 确定性采集
-    "xiaohongshu": "bin/xhs_search.py",   # ⏳ 待建(需 HB 扫码登录);文件不存在→gate 保持 pending
+    "xiaohongshu": "bin/xhs_search.py",   # ✅ 直连 xiaohongshu-mcp 确定性采集
+    "facebook": "bin/fb_search.py",       # ⚠️ 采集器就绪,但小号账号卡在 FB 新用户拦截流程(见 memory);运行时转 BLOCKED
 }
 _RECRAWL_TAG = re.compile(r"\[auto-recrawl d(\d+)\]")
 
@@ -176,6 +177,16 @@ def search_preprocess(db, t, spec):
 # ---- digester 深潜预处理:跑 reddit_deep/x_search 抓 community_raw,把路径注入上下文 ----
 # 与 search_preprocess 同构:采集(可能带 MCP/cookie)封在独立脚本里,digester 只读离线 community_raw。
 def deepdive_preprocess(db, t, spec):
+    # 预采集原料直注入(如 xhs_hot 已产好的每日热点 raw):不重跑采集,只注入路径+授权只读
+    m_raw = re.search(r"^read_raw:\s*(.+?)\s*$", spec, re.M)
+    if m_raw:
+        raw = m_raw.group(1).strip()
+        if (ROOT/raw).exists():
+            ev(db, t["id"], t["agent"], "read_raw", raw)
+            return (f"# 已抓取原料(只读它分析,禁止联网/MCP)\n路径:{raw}\n"
+                    f"其 frontmatter 的 content_hash/source_urls 继承进你的 envelope。\n\n" + spec)
+        ev(db, t["id"], t["agent"], "read_raw_missing", raw)
+        return spec + f"\n\n# ⚠️ 预采集原料缺失({raw}):如实输出 BLOCKED,勿编造。"
     plat = (re.search(r"^deepdive_platform:\s*(.+?)\s*$", spec, re.M) or [None, ""])
     plat = plat.group(1).strip().lower() if hasattr(plat, "group") else ""
     topic = re.search(r"^deepdive_topic:\s*(.+?)\s*$", spec, re.M)
@@ -188,7 +199,8 @@ def deepdive_preprocess(db, t, spec):
         return spec + f"\n\n# ⚠️ 深潜采集脚本未就位({plat}):无 community_raw 可读,如实输出 BLOCKED,勿凭先验编造原声。"
     entry = {"reddit": ("reddit_deep", "run_reddit_deep"),
              "x": ("x_search", "run_x_search"),
-             "xiaohongshu": ("xhs_search", "run_xhs_search")}.get(plat)
+             "xiaohongshu": ("xhs_search", "run_xhs_search"),
+             "facebook": ("fb_search", "run_fb_search")}.get(plat)
     if not entry:
         ev(db, t["id"], t["agent"], "deepdive_unknown_platform", plat)
         return spec + f"\n\n# ⚠️ 未知深潜平台({plat}):无 community_raw,如实输出 BLOCKED。"

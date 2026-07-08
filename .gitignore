@@ -17,3 +17,5 @@ logs/feishu_notify_chat
 logs/concierge_session
 logs/.feishu_tenant_token.json
 vendor/xhs/
+vendor/fb/
+data/xhs_hot_state/

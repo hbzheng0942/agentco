@@ -1,0 +1,1 @@
+{"mcpServers":{"collectors":{"type":"stdio","command":"/opt/agentco/.venv/bin/python","args":["/opt/agentco/bin/collectors_mcp.py"]}}}

@@ -1,0 +1,4 @@
+{"mcpServers":{
+  "collectors":{"type":"stdio","command":"/opt/agentco/.venv/bin/python","args":["/opt/agentco/bin/collectors_mcp.py"]},
+  "dialog-mcp":{"type":"http","url":"https://reddit-research-mcp.fastmcp.app/mcp"}
+}}

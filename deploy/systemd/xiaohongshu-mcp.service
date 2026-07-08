@@ -1,0 +1,11 @@
+[Unit]
+Description=xiaohongshu-mcp (agentco 小红书深潜采集后端, :18060)
+After=network.target
+[Service]
+ExecStart=/opt/agentco/vendor/xhs/xiaohongshu-mcp-linux-amd64
+Restart=always
+RestartSec=5
+User=ubuntu
+WorkingDirectory=/opt/agentco/vendor/xhs
+[Install]
+WantedBy=multi-user.target
