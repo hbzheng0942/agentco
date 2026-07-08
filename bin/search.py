@@ -13,7 +13,7 @@ CLI:  search.py --project <proj> --query "<q>" [--query "<q2>"...] [--sources gi
 API:  from search import run_search; path = run_search(queries, project, sources=[...])
 """
 import argparse, concurrent.futures as cf, hashlib, json, os, re, sys, urllib.parse, urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -24,6 +24,48 @@ TIMEOUT = 15
 TOPN_PER_ROUTE = 10
 TOPN_FINAL = 12
 _TRACKING = re.compile(r"^(utm_|gclid$|fbclid$|mc_|ref$|ref_src$|spm$)", re.I)
+
+# PR 通稿联合发布域:同一份 PR Newswire/Business Wire 稿件会同时出现在这些站,
+# 它们互相不构成独立交叉印证。corroboration 计数时只算一票,且给 syndicated 标记。
+WIRE_DOMAINS = {
+    "prnewswire.com", "businesswire.com", "globenewswire.com", "newswire.com",
+    "morningstar.com", "finance.yahoo.com", "yahoo.com", "markets.businessinsider.com",
+    "benzinga.com", "streetinsider.com", "manilatimes.net", "prweb.com", "einnews.com",
+}
+
+_MONTHS = {m: i for i, m in enumerate(
+    ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+_REL = re.compile(r"(\d+)\s*(hour|day|week|month|year)s?\s+ago", re.I)
+
+
+def parse_date(raw):
+    """把各源的日期字段统一成 YYYY-MM-DD;认不出返回 None(下游标 undated)。
+    覆盖:ISO datetime、'Feb 18, 2026'/'February 18, 2026'、'7 hours ago'/'1 week ago'。"""
+    if not raw:
+        return None
+    s = str(raw).strip()
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", s)   # ISO(brave page_age)
+    if m:
+        return m.group(0)
+    m = re.match(r"([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})", s)   # Feb 18, 2026
+    if m and m.group(1)[:3].lower() in _MONTHS:
+        return f"{int(m.group(3)):04d}-{_MONTHS[m.group(1)[:3].lower()]:02d}-{int(m.group(2)):02d}"
+    m = _REL.search(s)   # 相对时间:从今天回推
+    if m:
+        n, unit = int(m.group(1)), m.group(2).lower()
+        days = {"hour": 0, "day": 1, "week": 7, "month": 30, "year": 365}[unit] * (n if unit != "hour" else 0)
+        return (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    return None
+
+
+def _domain(url):
+    """可注册域(去 www/子域近似):example.co.uk 之类不精确但够用于通稿判定。"""
+    try:
+        host = urllib.parse.urlsplit(url).netloc.lower().split(":")[0]
+    except Exception:
+        return ""
+    parts = host.split(".")
+    return ".".join(parts[-2:]) if len(parts) >= 2 else host
 
 
 def normalize_url(u):
@@ -73,7 +115,8 @@ def brave(kind, query):
     for it in items[:TOPN_PER_ROUTE]:
         u = it.get("url")
         if u:
-            out.append((u, it.get("title", ""), it.get("description", "")))
+            dt = parse_date(it.get("page_age") or it.get("age"))
+            out.append((u, it.get("title", ""), it.get("description", ""), dt))
     return out
 
 
@@ -92,7 +135,7 @@ def serper(kind, query):
     for it in items[:TOPN_PER_ROUTE]:
         u = it.get("link")
         if u:
-            out.append((u, it.get("title", ""), it.get("snippet", "")))
+            out.append((u, it.get("title", ""), it.get("snippet", ""), parse_date(it.get("date"))))
     return out
 
 
@@ -117,7 +160,8 @@ def github_repos(query):
     return [(it["html_url"],
              f"{it['full_name']} ⭐{it['stargazers_count']}",
              f"{(it.get('description') or '').strip()} | lang:{it.get('language')} "
-             f"updated:{(it.get('pushed_at') or '')[:10]}")
+             f"updated:{(it.get('pushed_at') or '')[:10]}",
+             parse_date(it.get("pushed_at")))   # 仓库最近推送日=活跃度代理
             for it in items[:TOPN_PER_ROUTE]]
 
 
@@ -130,25 +174,36 @@ def reddit(query):
                                          "limit": TOPN_PER_ROUTE}))
         data = _http("GET", url, {"User-Agent": "agentco-search/1.0 (research bot)"})
         posts = [c.get("data", {}) for c in data.get("data", {}).get("children", [])]
+        def _rd(ts):
+            return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%d") if ts else None
         return [("https://www.reddit.com" + p["permalink"],
                  f"[r/{p.get('subreddit')}] {p.get('title')} (▲{p.get('score')} · {p.get('num_comments')}评论)",
-                 (p.get("selftext") or "")[:220])
+                 (p.get("selftext") or "")[:220], _rd(p.get("created_utc")))
                 for p in posts[:TOPN_PER_ROUTE] if p.get("permalink")]
     except Exception:
-        return [(u, f"[reddit] {t}", s) for u, t, s in serper("web", f"site:reddit.com {query}")]
+        return [(u, f"[reddit] {t}", s, d) for u, t, s, d in serper("web", f"site:reddit.com {query}")]
 
 
 def hackernews(query):
-    """Hacker News Algolia 搜索(免 key)。"""
-    url = ("https://hn.algolia.com/api/v1/search?"
-           + urllib.parse.urlencode({"query": query, "tags": "story",
-                                     "hitsPerPage": TOPN_PER_ROUTE}))
-    hits = _http("GET", url, {"User-Agent": "agentco-search"}).get("hits") or []
+    """Hacker News Algolia 搜索(免 key)。Algolia 是 AND 全词匹配,长自然语 query(带
+    latest/news 等套话)极易清零——空返回时缩到前几个实词重试(与 github_repos 同思路)。"""
+    def _q(q):
+        url = ("https://hn.algolia.com/api/v1/search?"
+               + urllib.parse.urlencode({"query": q, "tags": "story", "hitsPerPage": TOPN_PER_ROUTE}))
+        return _http("GET", url, {"User-Agent": "agentco-search"}).get("hits") or []
+    hits = _q(query)
+    if not hits:
+        words = [w for w in re.split(r"\s+", query)
+                 if w.lower() not in ("trending", "popular", "best", "top", "latest", "news", "update", "updates")]
+        if len(words) >= 2:
+            hits = _q(" ".join(words[:3]))
     out = []
     for h in hits[:TOPN_PER_ROUTE]:
         u = h.get("url") or f"https://news.ycombinator.com/item?id={h.get('objectID')}"
+        ts = h.get("created_at_i")
+        dt = datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%d") if ts else None
         out.append((u, f"[HN] {h.get('title')} (▲{h.get('points')} · {h.get('num_comments')}评论)",
-                    (h.get("story_text") or "")[:200]))
+                    (h.get("story_text") or "")[:200], dt))
     return out
 
 
@@ -210,23 +265,43 @@ def run_search(query, project="default", topn=None, sources=None):
             try:
                 results = fut.result()
                 route_status[label] = f"ok({len(results)})"
-                for rank, (u, title, snippet) in enumerate(results):
+                for rank, row in enumerate(results):
+                    u, title, snippet = row[0], row[1], row[2]
+                    date = row[3] if len(row) > 3 else None
                     key = normalize_url(u)
                     e = agg.setdefault(key, {"url": u, "title": title, "snippet": snippet,
-                                             "sources": set(), "score": 0.0})
+                                             "date": None, "sources": set(), "score": 0.0})
                     e["sources"].add(name)
                     e["score"] += 1.0 / (rank + 1)
                     if not e["title"] and title:
                         e["title"] = title
                     if not e["snippet"] and snippet:
                         e["snippet"] = snippet
+                    if date and not e["date"]:
+                        e["date"] = date
             except Exception as e:
                 route_status[label] = f"failed: {type(e).__name__}: {str(e)[:120]}"
 
     ranked = sorted(agg.values(), key=lambda e: (-e["score"], e["url"]))[:topn]
+
+    # 交叉印证:按归一化标题聚类,corroboration=簇内独立(非通稿)域数;
+    # 全簇都落在 WIRE_DOMAINS(同一份PR的多路转载)时标 syndicated,不算独立印证。
+    def _tkey(t):
+        return re.sub(r"[^\w一-鿿]+", "", (t or "").lower())[:50]
+    clusters = {}
+    for e in ranked:
+        clusters.setdefault(_tkey(e["title"]), []).append(e)
+    for grp in clusters.values():
+        indep = {_domain(e["url"]) for e in grp} - WIRE_DOMAINS   # 独立(非通稿)域
+        for e in grp:
+            # 自身落在通稿站,或整簇都是通稿转载 → 非独立信源
+            e["syndicated"] = _domain(e["url"]) in WIRE_DOMAINS or (len(grp) > 1 and not indep)
+            e["corroboration"] = len(indep) if indep else (0 if e["syndicated"] else 1)
+
     for e in ranked:
         e["sources"] = sorted(e["sources"])
         e["score"] = round(e["score"], 4)
+    dated = sum(1 for e in ranked if e["date"])
 
     # content_hash:对结果集(归一化url|title)稳定哈希
     h = hashlib.sha256()
@@ -241,7 +316,8 @@ def run_search(query, project="default", topn=None, sources=None):
     lines = ["---", "queries:"]
     lines += [f"  - {json.dumps(q, ensure_ascii=False)}" for q in queries]
     lines += [f"fetch_ts: {fetch_ts}",
-              f"content_hash: {content_hash}", "kind: search_raw", f"project: {project}", "routes:"]
+              f"content_hash: {content_hash}", "kind: search_raw", f"project: {project}",
+              f"items_dated: {dated}/{len(ranked)}", "routes:"]
     for name in sorted(route_status):
         lines.append(f"  {name}: {route_status[name]}")
     lines.append("source_urls:")
@@ -251,11 +327,16 @@ def run_search(query, project="default", topn=None, sources=None):
               f"> {len(active)}路并行({'+'.join(sorted(active))})×{len(queries)} query,加权去重后 top{len(ranked)}。"
               f"单路失败见 frontmatter.routes。模型只读本文件,不得联网;"
               f"蒸馏时必须评估语言/地域/平台覆盖面(frontmatter 的 queries 与 routes);"
-              f"github/reddit/hn 条目 title 内嵌热度(⭐/▲/评论数),蒸馏时引用。", ""]
+              f"github/reddit/hn 条目 title 内嵌热度(⭐/▲/评论数),蒸馏时引用。"
+              f"⚠️ date=(undated) 的条目时效不可判,不得凭空定档为近期信号;"
+              f"'⚠️通稿转载'条目是同一份PR的多路转载,只算一票印证,不得当作多源交叉验证;"
+              f"frontmatter.items_dated 是有日期条目占比,过半 undated 时整批时效可靠性存疑。", ""]
     for i, e in enumerate(ranked, 1):
         lines.append(f"## {i}. {e['title'] or '(无标题)'}")
         lines.append(f"- url: {e['url']}")
-        lines.append(f"- score: {e['score']}  sources: {', '.join(e['sources'])}")
+        lines.append(f"- date: {e['date'] or '(undated)'}")
+        corr = f"独立印证:{e['corroboration']}源" + ("(⚠️通稿转载,非独立)" if e["syndicated"] else "")
+        lines.append(f"- score: {e['score']}  sources: {', '.join(e['sources'])}  {corr}")
         if e["snippet"]:
             lines.append(f"- 摘要: {e['snippet']}")
         lines.append("")

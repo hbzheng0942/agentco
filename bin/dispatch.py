@@ -26,12 +26,20 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from agentlib import claude_bin, load_env
+from agentlib import claude_bin, load_env, enqueue
 load_env()  # cron 环境无 .env 变量;claude/notifier 子进程靠继承 os.environ 拿 LITELLM_MASTER_KEY 等
 
 ROOT = Path(__file__).resolve().parent.parent
 DB, TRACES, LOG = ROOT/"state.db", ROOT/"traces", ROOT/"logs/dispatch.log"
 MAX_ATTEMPTS = 2
+RECRAWL_MAX_DEPTH = 2       # gaps 自动补抓硬上限:原始→d1→d2 后强制收敛(审计收口)
+GAPS_MAX_ITEMS = 3         # 单次补抓/深潜最多取的缺口条目数,防 retriever 一次甩一堆
+DEEPDIVE_SCRIPT = {        # 社区深潜采集脚本(文件存在=该路上线;未就位只记事件,不造死任务)
+    "reddit": "bin/reddit_deep.py",       # ✅ ds-chat worker 驱动 reddit-research-mcp
+    "x": "bin/x_search.py",               # ✅ twitter-cli 确定性采集
+    "xiaohongshu": "bin/xhs_search.py",   # ⏳ 待建(需 HB 扫码登录);文件不存在→gate 保持 pending
+}
+_RECRAWL_TAG = re.compile(r"\[auto-recrawl d(\d+)\]")
 
 # 难度路由:tier=难度档(0=light 1=medium 2=heavy),入队时定,失败不自动升档。
 # 多模态仅 GPT 通道(-hi profile)可用;auditor 刻意不给 GPT(审 executor 产出须异厂商)。
@@ -165,6 +173,39 @@ def search_preprocess(db, t, spec):
         log(f"{t['id']} search.py 失败:{e}")
         return spec
 
+# ---- digester 深潜预处理:跑 reddit_deep/x_search 抓 community_raw,把路径注入上下文 ----
+# 与 search_preprocess 同构:采集(可能带 MCP/cookie)封在独立脚本里,digester 只读离线 community_raw。
+def deepdive_preprocess(db, t, spec):
+    plat = (re.search(r"^deepdive_platform:\s*(.+?)\s*$", spec, re.M) or [None, ""])
+    plat = plat.group(1).strip().lower() if hasattr(plat, "group") else ""
+    topic = re.search(r"^deepdive_topic:\s*(.+?)\s*$", spec, re.M)
+    if not plat or not topic:
+        return spec   # 非深潜 digester 任务(常规蒸馏),原样放行
+    topic = topic.group(1).strip()
+    script = DEEPDIVE_SCRIPT.get(plat)
+    if not (script and (ROOT/script).exists()):
+        ev(db, t["id"], t["agent"], "deepdive_script_missing", f"{plat}")
+        return spec + f"\n\n# ⚠️ 深潜采集脚本未就位({plat}):无 community_raw 可读,如实输出 BLOCKED,勿凭先验编造原声。"
+    entry = {"reddit": ("reddit_deep", "run_reddit_deep"),
+             "x": ("x_search", "run_x_search"),
+             "xiaohongshu": ("xhs_search", "run_xhs_search")}.get(plat)
+    if not entry:
+        ev(db, t["id"], t["agent"], "deepdive_unknown_platform", plat)
+        return spec + f"\n\n# ⚠️ 未知深潜平台({plat}):无 community_raw,如实输出 BLOCKED。"
+    try:
+        mod = __import__(entry[0])
+        fn = getattr(mod, entry[1])
+        raw = fn(topic, project=t["project"] or "default")
+        ev(db, t["id"], t["agent"], "deepdive", f"{plat} → {raw}")
+        log(f"{t['id']} deepdive({plat}) → {raw}")
+        return (f"# 已抓取社区原声(只读它分析,禁止联网/MCP)\n路径:{raw}\n"
+                f"kind=community_raw,原声在高赞评论里;其 frontmatter 的 content_hash/source_urls 继承进 envelope。\n\n" + spec)
+    except Exception as e:
+        ev(db, t["id"], t["agent"], "deepdive_fail", f"{plat}: {str(e)[:180]}")
+        log(f"{t['id']} deepdive({plat}) 失败:{e}")
+        return spec + f"\n\n# ⚠️ 深潜采集失败({plat}):{str(e)[:120]}。无 community_raw,如实输出 BLOCKED。"
+
+
 # ---- 依赖注入:上游产出路径显式给下游(协作只认带 hash 的 artifact,不让 worker 自己找) ----
 def dep_preprocess(db, t, spec):
     dep = t["depends_on"]
@@ -176,6 +217,63 @@ def dep_preprocess(db, t, spec):
                 f"它是你的输入源:先读它;其 envelope 的 content_hash/source_urls 必须继承进你的 envelope。\n\n" + spec)
     ev(db, t["id"], t["agent"], "dep_artifact_missing", str(dep))
     return spec
+
+
+# ---- gaps 补抓闭环:retriever 产出机读 gaps 块 → dispatcher 自动补抓/派深潜 ----
+# 审计收口:每轮补抓都是一条真实入队任务(DB 可见/可预算控),深度用 title 标记承载,
+# RECRAWL_MAX_DEPTH 硬上限后强制收敛,禁止无限刷 ds-chat。
+def parse_gaps(text):
+    """提取产出里的 ```gaps 围栏块 → dict。解析失败/无块返回 {}。"""
+    import yaml
+    m = re.search(r"```gaps\s*\n(.*?)```", text, re.S)
+    if not m:
+        return {}
+    try:
+        d = yaml.safe_load(m.group(1))
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+def _clean_list(v):
+    return [x for x in (v or []) if x][:GAPS_MAX_ITEMS] if isinstance(v, list) else []
+
+def handle_gaps(db, t, final):
+    """retriever 任务 done 后调用:读 gaps 块,派补抓(need_recrawl)/深潜(need_deepdive)。"""
+    if t["agent"] != "retriever":
+        return
+    gaps = parse_gaps(final)
+    if not gaps:
+        return
+    title0 = t["title"] or "intel"
+    m = _RECRAWL_TAG.search(title0)
+    depth = int(m.group(1)) if m else 0
+    base_title = _RECRAWL_TAG.sub("", title0).strip()
+    proj, pri = t["project"] or "default", (t["priority"] if t["priority"] is not None else 2)
+    recrawl = _clean_list(gaps.get("need_recrawl"))
+    if recrawl and depth < RECRAWL_MAX_DEPTH:
+        nid = enqueue("retriever", f"{base_title} [auto-recrawl d{depth+1}]",
+                      "gaps 自动补抓:就下列精炼 query 重抓,聚焦上一轮的检索盲区。",
+                      ttl=t["ttl_sec"], notify=0, project=proj, priority=pri, query=recrawl)
+        ev(db, t["id"], t["agent"], "gaps_recrawl", f"{nid} d{depth+1} n={len(recrawl)}")
+        log(f"{t['id']} gaps→补抓 {nid} (d{depth+1}) queries={recrawl}")
+    elif recrawl:
+        ev(db, t["id"], t["agent"], "gaps_recrawl_capped", f"depth={depth} 已达上限{RECRAWL_MAX_DEPTH}")
+    for dd in _clean_list(gaps.get("need_deepdive")):
+        plat = ((dd.get("platform") if isinstance(dd, dict) else "") or "").strip().lower()
+        target = (dd.get("target") if isinstance(dd, dict) else str(dd)) or ""
+        script = DEEPDIVE_SCRIPT.get(plat)
+        if script and (ROOT/script).exists() and target.strip():
+            # 派 digester 任务;实际社区采集由 deepdive_preprocess 跑 reddit_deep/x_search 落 community_raw 后注入
+            body = ("社区原声深潜:dispatcher 已用采集脚本抓好 community_raw 注入你的上下文,"
+                    "你只读它做痛点/需求/机会蒸馏(原声在高赞评论里,逐条回指)。\n"
+                    f"deepdive_platform: {plat}\ndeepdive_topic: {target}")
+            nid = enqueue("digester", f"社区深潜:{plat} {target[:40]}", body,
+                          notify=0, project=proj, priority=pri)
+            ev(db, t["id"], t["agent"], "gaps_deepdive", f"{nid} {plat} {target[:60]}")
+            log(f"{t['id']} gaps→深潜 {nid} ({plat}):{target[:60]}")
+        else:   # 采集脚本未就位/话题空:记事件,不造依赖不存在工具的死任务
+            ev(db, t["id"], t["agent"], "gaps_deepdive_pending", f"{plat} {target[:60]}")
+            log(f"{t['id']} gaps→深潜挂起(脚本未就位 {plat}):{target[:60]}")
 
 
 def run_task(db, t):
@@ -195,6 +293,8 @@ def run_task(db, t):
     record_skill_hits(db, tid, agent, spec)
     if agent == "retriever":
         spec = search_preprocess(db, t, spec)
+    elif agent == "digester":
+        spec = deepdive_preprocess(db, t, spec)
     spec = dep_preprocess(db, t, spec)
     trace_dir = TRACES/agent/datetime.now().strftime("%Y%m%d"); trace_dir.mkdir(parents=True, exist_ok=True)
     trace = trace_dir/f"{tid}.a{t['attempts']}.jsonl"
@@ -270,6 +370,10 @@ def run_task(db, t):
         ev(db, tid, agent, "done", profile)
         if new_status == "done":
             trigger_dependents(db, tid)
+            try:
+                handle_gaps(db, t, final)   # 补抓闭环:不因 gaps 处理异常连累主任务落盘
+            except Exception as e:
+                ev(db, tid, agent, "gaps_error", str(e)[:160])
         if t["notify"]:
             link = feishu_archive(inbox or out, f"{tid}-{agent}.md")
             extra = {"artifacts": artifacts, "doc_url": link, "cost": cost, "dur_s": dur_s}
