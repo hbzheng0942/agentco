@@ -25,7 +25,7 @@ done
 # 3. claude -p worker 引擎(Wave④:codex → claude,经 litellm /v1/messages)
 ck "litellm /v1/messages(anthropic 格式端点)" "curl -sf -m 60 http://127.0.0.1:4000/v1/messages -H \"Authorization: Bearer \$LITELLM_MASTER_KEY\" -H 'Content-Type: application/json' -d '{\"model\":\"ds-chat\",\"max_tokens\":50,\"messages\":[{\"role\":\"user\",\"content\":\"reply OK\"}]}' | grep -q '\"type\":\"message\"'"
 ck "claude -p worker via litellm(ds-chat 工具循环)" "echo '用Read读 kb/00-core/principles.md 第一行然后原样输出' | CLAUDE_CONFIG_DIR=$ROOT/.claude-worker ANTHROPIC_BASE_URL=http://127.0.0.1:4000 ANTHROPIC_AUTH_TOKEN=\$LITELLM_MASTER_KEY CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 timeout 120 claude -p --model ds-chat --max-turns 4 --output-format json --strict-mcp-config --setting-sources '' --allowedTools 'Read,Glob,Grep' --disallowedTools 'Bash,Write,Edit,WebSearch,WebFetch,Task' | python3 -c 'import json,sys; d=json.loads(sys.stdin.read().splitlines()[-1]); sys.exit(0 if not d[\"is_error\"] and d[\"num_turns\"]>=2 else 1)'"
-ck "claude profiles.json 全 profile 就位" "python3 -c \"import json;p=json.load(open('config/claude-profiles/profiles.json'));assert all(k in p for k in ['retriever','retriever-long','executor-code','executor-code-hi','executor-data','executor-data-hi','executor-3d','digester','digester-hi','auditor'])\""
+ck "claude profiles.json 全 profile 就位" "python3 -c \"import json;p=json.load(open('config/claude-profiles/profiles.json'));assert all(k in p for k in ['retriever','retriever-long','executor-ds','executor','executor-3d','digester','digester-hi','digester-visual','auditor'])\""
 ck "Stop hook 脚本可执行且容错(空输入放行)" "echo '{}' | python3 bin/report_stop_hook.py"
 ck "concierge 会话通(haiku 订阅)" "python3 -c 'import sys;sys.path.insert(0,\"bin\");import concierge;r,_=concierge.chat(\"回复两个字:在的\");sys.exit(0 if r else 1)'"
 ck "CLIProxyAPI 已登录且暴露 gpt-5.4/5.5" "curl -sf -m 10 http://127.0.0.1:8317/v1/models -H \"Authorization: Bearer \$CLIPROXY_API_KEY\" | grep -q 'gpt-5.5'"
@@ -42,7 +42,7 @@ if [ -n "${BRAVE_API_KEY:-}" ] || [ -n "${SERPER_API_KEY:-}" ]; then
     ck "search.py: raw 落盘带 content_hash" "grep -q '^content_hash: ' \"$ROOT/$RAW\""
     ck "search.py: Brave news endpoint 通(/res/v1/news/search 独立于 web)" "grep -q 'brave_news: ok(' \"$ROOT/$RAW\""
     ck "search.py: Serper news endpoint 通(/news 独立于 /search)" "grep -q 'serper_news: ok(' \"$ROOT/$RAW\""
-    ck "search.py: 四路加权去重后 top≤12" "[ \$(grep -c '^## ' \"$ROOT/$RAW\") -le 12 ]"
+    ck "search.py: 加权去重后不超硬顶(topn≤30,多路由放宽名额见 run_search)" "[ \$(grep -c '^## ' \"$ROOT/$RAW\") -le 30 ]"
     echo "   ↳ routes 实况: $(grep -A5 '^routes:' "$ROOT/$RAW" | grep ': ' | tr '\n' ' ')"
     rm -rf "$ROOT/kb/30-projects/_verify"
   else

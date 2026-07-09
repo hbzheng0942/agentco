@@ -41,3 +41,16 @@
 
 - Stefan 本人 + learn3d.ai:把 workflow 变成课程卖——知识被 harness 进人脑,不是系统
 - MiniMax Hub("Real AI Agent for Creatives",102K views):agent 化方向的对手信号,待深挖
+- **Top 3D AI Arena**(Stefan 自建,压测卡 T-014 发现):3D AI 工具 Elo 盲投排行榜,
+  反操纵设计,分维度排名(general/geometry/low-poly/segmentation)——
+  他已经在做"社区化验收基础设施",这是 workflow harness 里"验收门"的市场雏形
+- **Asset Hub**(T-012 发现):聚合平台(参考图→部件提取→3D生成→retopo→UV→纹理,
+  内嵌 Tripo P1/Hunyuan 可混搭)——"工具编排"的商业化已开始,但编排的是工具调用,
+  不是工序知识(验收判据/回退逻辑仍在 Stefan 脑子里)——这正是我们的差异位
+
+## L1 蒸馏校准结论(2026-07-09)
+
+- workflow/教程类:schema v1.1 直接适配,卡片质量≈golden card 的 85%+
+- 横评类:digester 自主提出 **Tool Evaluation Card** 变体(评分矩阵/社区信号/定价模型/
+  购买决策树)——待第二品类样本确认后定稿变体 schema
+- ASR 系统性失真确认:Claude→"Cloth/CloD",数字含混——L3 视觉层的必要性再添一证

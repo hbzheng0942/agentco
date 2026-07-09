@@ -5,8 +5,8 @@
   "executor-ds":     {"model": "ds-chat",     "max_turns": 15, "instructions": "executor.md"},
   "executor":        {"model": "gpt-5.5",     "max_turns": 15, "instructions": "executor.md"},
   "executor-3d":     {"model": "ds-chat",     "max_turns": 15, "instructions": "executor.md"},
-  "digester":        {"model": "ds-reasoner", "max_turns": 10, "instructions": "digester.md"},
-  "digester-hi":     {"model": "gpt-5.5",     "max_turns": 10, "instructions": "digester.md"},
-  "digester-visual": {"model": "kimi-long",   "max_turns": 10, "instructions": "digester.md"},
+  "digester":        {"model": "ds-reasoner", "max_turns": 16, "instructions": "digester.md"},
+  "digester-hi":     {"model": "gpt-5.5",     "max_turns": 16, "instructions": "digester.md"},
+  "digester-visual": {"model": "kimi-long",   "max_turns": 16, "instructions": "digester.md"},
   "auditor":         {"model": "qwen-max",    "max_turns": 6,  "instructions": "auditor.md"}
 }

@@ -21,6 +21,11 @@ p.add_argument("--difficulty", choices=["light", "medium", "heavy"],
 p.add_argument("--body")
 a = p.parse_args()
 if a.spec:
+    # spec 模式下 body 不进投递链路(worker 只见 spec+title)。曾静默丢弃 --body
+    # 致任务缺参数被 blocked(2026-07-09 T-002~006 实锤)→ 改为响亮拒绝。
+    if a.body is not None:
+        sys.exit("enqueue: --spec 与 --body 不能并用(worker 只读 spec 内容,title/body 都不进 prompt)。"
+                 "参数化任务用 --body:body 会落成该任务专属 spec,在 body 里引用共享规约文件即可。")
     body = a.title
 elif a.body is not None:
     body = a.body

@@ -364,6 +364,21 @@ def run_task(db, t):
         proj = t["project"] or "default"
         out = ROOT/"handoff"/proj/f"{tid}.result.md"          # 与 spec 同项目目录,禁扁平落 handoff/
         out.parent.mkdir(parents=True, exist_ok=True)
+        # worker 自报 BLOCKED(缺原料/缺参数)≠ 完成:留 result 供裁决,不落 inbox 不触发下游
+        if (report.get("tldr", "").upper().startswith("BLOCKED")
+                or body.lstrip().lstrip("*#").lstrip().upper().startswith("BLOCKED")):
+            out.write_text(f"# {tid} result ({agent}/{profile})\n\n{body}\n\n"
+                           f"{canonical_envelope(t, profile, urls, chash, [str(out.relative_to(ROOT))])}\n")
+            db.execute("UPDATE tasks SET status='blocked',result_path=?,updated_at=datetime('now') WHERE id=?",
+                       (str(out.relative_to(ROOT)), tid))
+            ev(db, tid, agent, "block", "worker self-reported BLOCKED")
+            propagate_block(db, t)
+            if t["notify"]:
+                notify(tid, "blocked", report if report.get("tldr") else
+                       {"tldr": body.strip().splitlines()[0][:60]},
+                       {"reason": "worker self-reported BLOCKED", "result": str(out.relative_to(ROOT))})
+            db.commit()
+            return
         artifacts = [str(out.relative_to(ROOT))]
         inbox = None
         if agent in INBOX_AGENTS:
