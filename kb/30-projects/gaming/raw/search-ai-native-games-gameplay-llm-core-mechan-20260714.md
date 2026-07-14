@@ -1,0 +1,181 @@
+---
+queries:
+  - "AI-native games gameplay LLM core mechanic 2025 2026 hits revenue"
+  - "generative AI game new genre experimental steam"
+fetch_ts: 2026-07-14T03:48:09+00:00
+content_hash: 6da368577db7fb33
+kind: search_raw
+project: gaming
+items_dated: 20/22
+routes:
+  brave_news[en0]: ok(10)
+  brave_news[en1]: ok(10)
+  brave_web[en0]: ok(10)
+  brave_web[en1]: ok(10)
+  github[en0]: ok(10)
+  github[en1]: ok(10)
+  hn[en0]: ok(1)
+  hn[en1]: ok(10)
+  reddit[en0]: ok(10)
+  reddit[en1]: ok(10)
+  serper_news[en0]: ok(1)
+  serper_news[en1]: ok(10)
+  serper_web[en0]: ok(10)
+  serper_web[en1]: ok(10)
+source_urls:
+  - https://arxiv.org/html/2607.00527v1
+  - https://www.wired.com/story/video-games-ai-copyright/
+  - https://medium.com/@hmason/the-state-of-ai-native-games-lessons-from-the-frontier-3e696a9e3279
+  - https://www.reddit.com/r/gaming/comments/1ix079s/steam_players_are_requesting_to_be_able_to_filter/
+  - https://www.totallyhuman.io/blog/the-surprising-number-of-steam-games-that-use-genai
+  - https://github.com/AlayaLab/AlayaRenderer
+  - https://github.com/microsoft/generative-ai-for-beginners
+  - https://nexworld.wiki/en/ai-games/ai-games-panorama-2026/
+  - https://store.steampowered.com/app/1889620/AI_Roguelite/
+  - https://www.gamegrin.com/news/crimson-deserts-pearl-abyss-admits-to-undisclosed-ai-use-in-steam/
+  - https://www.linkedin.com/posts/analytics-india-magazine_varun-mayya-founder-of-aeos-games-has-revealed-activity-7317795367004086273-dhAV
+  - https://www.reddit.com/r/gamedev/comments/1rpeeta/i_analyzed_3_years_of_gdc_reports_on_generative/
+  - https://www.sapientstudio.com/
+  - https://www.techpowerup.com/350230/games-made-with-gen-ai-suffer-up-to-53-worse-sales-on-steam
+  - https://insider-gaming.com/steam-next-fest-great-but-ai-games-is-not/
+  - https://store.steampowered.com/app/2667830/EmemeTown/
+  - https://aiandgames.com/p/001-a-primer-on-ai-in-the-2026-games
+  - https://games.gg/news/five-new-steam-games-missed/
+  - https://github.com/CopilotKit/CopilotKit
+  - https://github.com/igloomatics/Awesome-AI-native-games-collection
+  - https://twitter.com/ehalm_/status/1698107101892268113
+  - https://www.aiandgames.com/p/10-predictions-for-ai-in-games-for
+---
+
+# 搜索原料:AI-native games gameplay LLM core mechanic 2025 2026 hits revenue / generative AI game new genre experimental steam
+
+> 7路并行(brave_news+brave_web+github+hn+reddit+serper_news+serper_web)×2 query,加权去重后 top22。单路失败见 frontmatter.routes。模型只读本文件,不得联网;蒸馏时必须评估语言/地域/平台覆盖面(frontmatter 的 queries 与 routes);github/reddit/hn 条目 title 内嵌热度(⭐/▲/评论数),蒸馏时引用。⚠️ date=(undated) 的条目时效不可判,不得凭空定档为近期信号;'⚠️通稿转载'条目是同一份PR的多路转载,只算一票印证,不得当作多源交叉验证;frontmatter.items_dated 是有日期条目占比,过半 undated 时整批时效可靠性存疑。
+
+## 1. AI Native Games: A Survey and Roadmap
+- url: https://arxiv.org/html/2607.00527v1
+- date: 2026-07-01
+- score: 1.5  sources: brave_web, serper_web  独立印证:1源
+- 摘要: Rather, they are games in which generative AI functions as a constitutive core mechanism: if the AI component is removed, the central form of play either collapses or becomes fundamentally different [73, 17]. This counterfactual criterion distinguishes AI-native games from AI-assisted production, AI-generated static assets, conventional game AI, procedural content generation, and optional conversational NPC systems [88, 65, 39]. Recent surveys have examined large language models (LLMs) and games, procedural content generation (PCG), mixed-initiative design, and AI agents in games.
+
+## 2. [HN] Generative AI in Games Will Create a Copyright Crisis (▲17 · 1评论)
+- url: https://www.wired.com/story/video-games-ai-copyright/
+- date: 2023-07-04
+- score: 1.4333  sources: hn  独立印证:1源
+
+## 3. The State of AI-Native Games: Lessons from the Frontier | by Hilary Mason | Medium
+- url: https://medium.com/@hmason/the-state-of-ai-native-games-lessons-from-the-frontier-3e696a9e3279
+- date: 2026-04-17
+- score: 1.3333  sources: brave_news, brave_web  独立印证:1源
+- 摘要: At GDC 2026, Eleanor Todd and Hilary Mason presented an analysis of the AI-native games that have launched, scaled, and — in some cases — spectacularly failed over the past several years. This talk sums up the state of AI Native Games in 2026.
+
+## 4. [reddit] r/gaming - [Steam] Players are requesting to be able to filter ...
+- url: https://www.reddit.com/r/gaming/comments/1ix079s/steam_players_are_requesting_to_be_able_to_filter/
+- date: 2025-07-14
+- score: 1.25  sources: reddit, serper_web  独立印证:1源
+- 摘要: Players are requesting to be able to filter out steamcommunity.com. Generative A.I. will affect game development, Steam added a new filter for ...
+
+## 5. The Surprising Number of Steam Games that Use GenAI — Totally Human Media
+- url: https://www.totallyhuman.io/blog/the-surprising-number-of-steam-games-that-use-genai
+- date: 2025-07-16
+- score: 1.1429  sources: brave_web, serper_web  独立印证:1源
+- 摘要: To be fair, AI generators mostly get fingers right these days. But even with these advances, imagery generated by DALL*E, the zillion offshoots of Stable Diffusion, and even Midjourney are often easily detectable. They have a look to them! This morning, I saw a Steam game pop up on We ❤ Every Game&#x27;s fancy-pants Fire Hose hub.
+
+## 6. AlayaLab/AlayaRenderer ⭐693
+- url: https://github.com/AlayaLab/AlayaRenderer
+- date: 2026-05-05
+- score: 1.0  sources: github  独立印证:1源
+- 摘要: Generative World Renderer: an AI-native Renderer for Games and Virtual Worlds. | lang:Python updated:2026-05-05
+
+## 7. microsoft/generative-ai-for-beginners ⭐112964
+- url: https://github.com/microsoft/generative-ai-for-beginners
+- date: 2026-07-14
+- score: 1.0  sources: github  独立印证:1源
+- 摘要: 21 Lessons, Get Started Building with Generative AI | lang:Jupyter Notebook updated:2026-07-14
+
+## 8. AI-Native Games Panorama Report (2025-2026) | NEXWORLD
+- url: https://nexworld.wiki/en/ai-games/ai-games-panorama-2026/
+- date: (undated)
+- score: 1.0  sources: brave_web  独立印证:1源
+- 摘要: AI-native games in 2025–2026 may be at a similar inflection point. Death by AI proved that AI games can go viral and achieve commercial sustainability · Chongzhen Simulator proved that traditional buy-to-play users are willing to pay for AI inference · AI Roguelite proved that an LLM can serve as a complete game engine · Fan-made “simulator” titles proved that solo developers can create hits in a week using AI
+
+## 9. AI Roguelite on Steam
+- url: https://store.steampowered.com/app/1889620/AI_Roguelite/
+- date: 2026-06-17
+- score: 1.0  sources: brave_web  独立印证:1源
+- 摘要: If you&#x27;ve ever played other AI &quot;games&quot; such as AI Dungeon and were frustrated by how they didn&#x27;t feel like a game, then <strong>AI Roguelite</strong> might be the perfect game for you. AI-generated entities: What weapons might you find in an underwater city?
+
+## 10. Crimson Desert's Pearl Abyss Admits to Undisclosed AI Use in Steam
+- url: https://www.gamegrin.com/news/crimson-deserts-pearl-abyss-admits-to-undisclosed-ai-use-in-steam/
+- date: 2026-03-24
+- score: 1.0  sources: serper_news  独立印证:1源
+- 摘要: Crimson Desert has officially come out after a tumultuous time for Pearl Abyss. Following a stock plummet after the critic reviews launched...
+
+## 11. Varun Mayya, founder of Aeos Games, has revealed ‘Unleash the Avatar (Project 11A)’, a groundbreaking India-made game that aims to rival global hits like Sekiro, Ghost of Tsushima, and Horizon Forbidden West. Slated for a 2026 release, the game blends c
+- url: https://www.linkedin.com/posts/analytics-india-magazine_varun-mayya-founder-of-aeos-games-has-revealed-activity-7317795367004086273-dhAV
+- date: 2025-04-14
+- score: 1.0  sources: serper_news  独立印证:1源
+
+## 12. [reddit] I analyzed 3 years of GDC reports on generative AI in ...
+- url: https://www.reddit.com/r/gamedev/comments/1rpeeta/i_analyzed_3_years_of_gdc_reports_on_generative/
+- date: 2026-03-16
+- score: 1.0  sources: reddit  独立印证:1源
+- 摘要: On the AI-generated concern, according to the 2025 report, developers specifically cited intellectual property theft, energy consumption, ...
+
+## 13. [HN] Show HN: Sapient – AI Agent for Unreal Engine: Code, Blueprints, Game AI (▲5 · 0评论)
+- url: https://www.sapientstudio.com/
+- date: 2025-07-15
+- score: 1.0  sources: hn  独立印证:1源
+- 摘要: After years of rebuilding the same core systems, chasing down bugs across code to assets, constantly losing momentum to engine blockers, and using the latest AI tools, we started wondering, “how much 
+
+## 14. Games Made With Gen AI Suffer Up To 53% Worse Sales on Steam | TechPowerUp
+- url: https://www.techpowerup.com/350230/games-made-with-gen-ai-suffer-up-to-53-worse-sales-on-steam
+- date: 2026-06-23
+- score: 1.0  sources: brave_news  独立印证:1源
+- 摘要: It's no secret that large game studios are leaning into generative AI in search of greater productivity and efficiency, but there is a growing resentment in the gaming and game dev community towards games created with generative AI. In a recent analysis published on Game Oracle, data analyst, ...
+
+## 15. Steam Next Fest is Great, But The Slew of Gen-AI Art and Games Isn't - Insider Gaming
+- url: https://insider-gaming.com/steam-next-fest-great-but-ai-games-is-not/
+- date: 2026-06-19
+- score: 0.6667  sources: brave_news, serper_web  独立印证:1源
+- 摘要: Steam Next Fest is here and that's a great thing, but what isn't so good is the vast library of gen-AI content packed into these demos.
+
+## 16. EmemeTown on Steam
+- url: https://store.steampowered.com/app/2667830/EmemeTown/
+- date: (undated)
+- score: 0.6111  sources: brave_web, serper_web  独立印证:1源
+- 摘要: We will provide you with tools and a place to experiment with generative AI at your disposal. We invite you to lend your imagination to Ememe. By actively listening to and reflecting your feedback and suggestions, we aim to make Ememe and the AI characters that live in it beloved by everyone.” · “The game will be offered as Early Access for at least 12 months.
+
+## 17. #001: A Primer on AI in the 2026 Games Industry
+- url: https://aiandgames.com/p/001-a-primer-on-ai-in-the-2026-games
+- date: 2026-07-10
+- score: 0.5  sources: brave_news  独立印证:1源
+- 摘要: From Game AI to Generative AI, we break it all down for you.
+
+## 18. Five New Steam Games You Probably Missed March 9th 2026
+- url: https://games.gg/news/five-new-steam-games-missed/
+- date: 2026-06-14
+- score: 0.5  sources: serper_news  独立印证:1源
+- 摘要: From underwater exploration to galactic trading, five under-the-radar Steam releases this week deserve a spot on your wishlist.
+
+## 19. CopilotKit/CopilotKit ⭐36006
+- url: https://github.com/CopilotKit/CopilotKit
+- date: 2026-07-14
+- score: 0.5  sources: github  独立印证:1源
+- 摘要: The Frontend Stack for Agents & Generative UI. React, Angular, Mobile, Slack, and more.  Makers of the AG-UI Protocol | lang:TypeScript updated:2026-07-14
+
+## 20. igloomatics/Awesome-AI-native-games-collection ⭐4
+- url: https://github.com/igloomatics/Awesome-AI-native-games-collection
+- date: 2026-07-02
+- score: 0.5  sources: github  独立印证:1源
+- 摘要: A curated list of ai native games and relative resources | lang:None updated:2026-07-02
+
+## 21. [HN] SmashOrPassAI, a generative AI party game (▲5 · 0评论)
+- url: https://twitter.com/ehalm_/status/1698107101892268113
+- date: 2023-09-03
+- score: 0.5  sources: hn  独立印证:1源
+
+## 22. 10 Predictions for AI in Games for 2026 | 14/01/26
+- url: https://www.aiandgames.com/p/10-predictions-for-ai-in-games-for
+- date: 2026-01-14
+- score: 0.5  sources: serper_web  独立印证:1源
+- 摘要: With over 4000 AI tagged games in 2025, expect 1-in-3 games on Steam to have AI disclosures in 2026. AI-native gameplay concept.
