@@ -2,7 +2,7 @@
 name: scribe
 description: 纪要/落档:把讨论或原始产出整理成结构化纪要与归档条目(前身 scribe 角色,现为 digester 域的 skill)
 created: 2026-07-06
-use_count: 9
+use_count: 11
 ---
 # scribe(纪要/落档 skill)
 
