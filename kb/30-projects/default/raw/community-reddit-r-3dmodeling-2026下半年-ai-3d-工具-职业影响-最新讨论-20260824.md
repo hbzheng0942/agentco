@@ -1,0 +1,88 @@
+---
+kind: community_raw
+platform: reddit
+topic: "r/3Dmodeling 2026下半年 AI 3D 工具 职业影响 最新讨论"
+fetch_ts: 2026-08-24T00:08:55+00:00
+content_hash: d77c8d9b47aef916
+project: default
+model: ds-chat
+trace: traces/reddit_deep/20260824/r-3dmodeling-2026下半年-ai-3d-工具-职业影响-最新讨论.json
+source_urls:
+  - https://reddit.com/r/3Dmodeling/comments/1t70q25/how_to_get_a_3dcharacter_artist_job_in_2026/
+  - https://reddit.com/r/3Dmodeling/comments/1vep6ld/selling_3d_courses_is_just_a_ponzi_scheme_now/
+  - https://reddit.com/r/3Dmodeling/comments/1vi4w0p/my_friend_says_the_ai_generated_models_are_better/
+  - https://reddit.com/r/3Dmodeling/comments/1vlghs6/are_3d_artist_still_finding_work/
+  - https://reddit.com/r/blender/comments/1v53i40/will_ai_be_able_to_take_away_jobs/
+  - https://reddit.com/r/blender/comments/1vds0ss/ai_messed_with_your_career_share_your_story/
+---
+
+# 社区原声:reddit / r/3Dmodeling 2026下半年 AI 3D 工具 职业影响 最新讨论
+
+> reddit-research-mcp 深潜采集(ds-chat 忠实转录,未分析)。**原声在高赞评论里**;digester 蒸馏时逐条痛点回指具体评论(带▲赞数),交叉验证,勿把评论区综合成一句。
+
+## [r/3Dmodeling] Are 3d Artist still finding work?
+- url: https://reddit.com/r/3Dmodeling/comments/1vlghs6/are_3d_artist_still_finding_work/
+- score: ▲59 · 53评论 · date: 2026-08-10
+- 楼主原声: Hi everyone, I'm a 3D artist and have been working in 3D for around 3 years, mainly focusing on modeling, texturing, and creating assets. Lately, I've been wondering — is there still a good amount of work out there for 3D artists? I know the industry has become much more competitive with AI, layoffs, and changing workflows, but I'd really like to hear from other artists who are currently working in the field. What areas are you seeing the most opportunities in right now — games, product visualization, advertising, VFX, 3D printing, or something else?
+- 高赞评论(原声):
+  - ▲75 "So Ive been doing this professionally for about 15 years. Im currently a model lead at a large vfx studio in London. The issue currently is the complete and total over saturation of 3d artists looking for work. There are hundreds of applicants per job posting for asset related jobs. That will eventually thin out as people look to do something else as a career. This is probably one of the worst timelines to be starting out your career as a 3d artist in film, games, or animation."
+  - ▲34 "There are still jobs in environment art for games but you will have significantly more competition now. Our last job posting had over 1000 applications. About 50 of them were very qualified; normally, back then we only had maybe 1-3 very qualified applicants. There are a few that I know who have gotten jobs from posting their art and process on linkedin a lot. I also personally have gotten a few contract offers from people I've known that work in the indie space. Those kind of jobs will never be posted on a job board and the only way to get those is to meet more people."
+  - ▲23 "Is there work? Yes. Is it easy to find? Sort of. The games industry isnt having a good time right now. Over 50k artists have been laid off over the past two years. But you can find jobs in other industries. Ive done 3d work in aviation, themed entertainment (theme parks), and medical. Its not simple, these jobs require connections. But its worth doing if youre able to find something. But your portfolio HAS to be good. Like really good."
+  - ▲19 "Been laid off twice since sept 2024. Currently on a short term contract and only got that because of an old coworker. Right now it feels like you need a very solid referral to have any chance."
+  - ▲16 "This is one of the few industries that you can tap into tons of sub industries (medical, product, architecture, aviation, geospatial mapping, fashion, etc). My journey was supposed to take me into cinematography and the video game world but that never happened and frankly I'm happy about it. I've worked in a multitude of different industries doing anything 3d. My point is don't limit yourself to one 3d avenue (your skills are more robust than you think). That said, spend time on your portfolio, find expos where you can make connections and lastly, apply to anything that interests you no matter what. Hate to be a Debbie downer but none of us can afford to be picky right now"
+  - ▲4 "Salaries are still stuck at 2024 levels, it's hard to find a job, and there are no direct openings anymore. Now they want 3D AI artists, AI level artists, and AI level designers for pennies. Everyone is saying 'what's so hard about it, just press a button and we'll pay you a few pennies, we're doing you a favor anyway.' That's how things are in this industry right now. It's dying"
+
+## [r/3Dmodeling] Selling 3D courses is just a ponzi scheme now
+- url: https://reddit.com/r/3Dmodeling/comments/1vep6ld/selling_3d_courses_is_just_a_ponzi_scheme_now/
+- score: ▲99 · 48评论 · date: 2026-08-03
+- 楼主原声: Referring more generally to architecture, film, and games, I think anyone selling a course is really only making money off people who won't be able to then make money with the skill they've learned, rather only by in turn themselves making a course to sell to the next round of would be modelers, hence the MLM/ponzi scheme pattern that always requires new 3D artists to prey upon. The only exception I see are cheaper courses that are directly targeting people who are hobbyists… I've thought about this because with video game, freelance, and toy design 3D modeling experience under my belt but also seeing future opportunities dwindle (AI and/or cheap outsourcing), I thought about making some sort of paid course but I couldn't see charging money to learn this depreciating skill as anything but taking advantage of beginners' ignorance.
+- 高赞评论(原声):
+  - ▲44 "It's because every single 'How you can earn money from 3D' video says sell tutorials, and everyone wants a slice from the pie. I've looked through maybe more than a hundred tutorials, and I can say that I've had exactly one tutorial that I think offers something you can't find on YouTube. I've learned more from watching modeling timelapses than I've learned from any of these courses."
+  - ▲41 "You don't really need 'courses' for anything anymore. Just free YouTube tutorials. Every single 'course' I've seen offered for anything is always just stuff you can read about yourself without their help or free online tutorials. It's sad how many horrible people got rich from idiots buying their tutorials."
+  - ▲36 "Man I disagree. I'll give you an examples - CGBoost has a $70 (might be more now) character course that covers in depth sculpting a character, retopology, UV, making clothes hair, painting, textures - all continuously on the same character building on previous knowledge while teaching professional techniques. I've worked through maybe a third of the content it's a HUGE course with more to come. I'm sorry this course is much better than finding scattered, sometimes antiquated courses on YouTube. I think it's possible to get the skills from this course from varying videos but for, say, people who have full time jobs and want structure, professionalism, updates, quality paid courses are worth much more even than what they cost."
+  - ▲10 "The only courses I've ever bought into are from Udemy because courses are rated and reviewed by users. Also from gamedev.tv when they're on crazy sale."
+  - ▲10 "This is absurd. Crying about paying to learn vital skills is peak entitlement, and it seems your real complaint is your own inability to make money from your skill set. That's not a problem with people selling training, and the industry isn't dwindling for people who know how to monetize their skill set correctly. Maybe you need that course after all..."
+
+## [r/3Dmodeling] My friend says the AI generated models are better than mine, I'm confused are they that bad?
+- url: https://reddit.com/r/3Dmodeling/comments/1vi4w0p/my_friend_says_the_ai_generated_models_are_better/
+- score: ▲21 · 35评论 · date: 2026-08-06
+- 楼主原声: I show my friend my 3d models eagerly, hoping he'll like it. Then he was like "AI does this better anyways, hahaha" Am I in a toxic friendship, or my models are so bad that AI's unpolished models look better than these? This is the model that I showed him, can someone lmk, I'm dyin 😭
+- 高赞评论(原声):
+  - ▲126 "Your friend is a PoS."
+  - ▲23 "Your pals either trying to joke with you or he's being a cunt"
+  - ▲16 "You are in a toxic friendship. Your models are fine. It sounds like jealousy of what you've accomplished. Sometimes when people see their friends doing cool things and they aren't, they downplay those things to make themselves feel better."
+  - ▲8 "he doesn't know what are saying, ai models are crap when talkin bout topology and edge flow"
+  - ▲5 "Y'all must not be friends for long if you don't know if they are being a dick or just joking. As a 32yo man with dozens of legitimatized friends, imma choose to not judge your friend nor your relationship. I can only assume from this that you both are still quite young cause otherwise you'd know who you're dealing with and validation wouldn't be needed. It's like a bunch of strangers telling you to break up with your bf/gf...the strangers have no info to go on other than half a paragraph of info. Continue your friendship. Continue to be an artist. Life will flow the way it should and you will live and learn. The only qualified judge here is you and whatever higher power you believe in. All of this gets figured out with time and age...not reddit, not clicks, not drive-by comments. Good luck OP."
+
+## [r/blender] AI messed with your career? Share your story
+- url: https://reddit.com/r/blender/comments/1vds0ss/ai_messed_with_your_career_share_your_story/
+- score: ▲0 · 32评论 · date: 2026-08-02
+- 楼主原声: Hey folks, I'm working on a short-form documentary project about how AI is actually affecting people's work and income right now. 3D artists have obviously been heavily impacted. I'm looking for anyone who's lost a job, clients, or work because of AI, or who really believes AI is a big reason they lost work even if you can't prove it 100% (as long as you can explain why you think so), or anyone whose job, hours, or income has changed in a real way because of it. If that's you, I'd love to hear what happened. It doesn't have to be all doom and gloom. Give me the honest picture. US only… Drop a comment or DM me if interested.
+- 高赞评论(原声):
+  - ▲8 "You definitely sound like an amateur"
+  - ▲2 "Do your customers know you use AI? If so, whatever. If not, you're a scammer."
+  - ▲-12 "As an amateur artist it's opened up opportunities to make my own projects and has turned a hobby into an actual career. It's allowed me to afford RnD and has sped up every single one of my workflows and automation gets rid of so many annoying tasks it's awesome. IMO for actual creatives it's a game changer if your only skill is to model what you were told to make or art handed to you good luck."
+  - ▲-6 "I think the main adaptation people need to make is there are going to be a lot less people required for a project as far as just common modeling tasks. An artist doesn't need to delegate as many tasks to other people. So if you only want to just have a job modeling stuff I think you will eventually be replaced. The people who design the concepts and lore and art won't need you to model it anymore. Less people per project. In short you can't just be a cog in the machine and need to move to higher level tasks and stop trying to work your way into a big studio. Form small teams, solo projects, or if you can high level position at a studio is only safe bet IMO, not totally true everywhere now but I think it's coming. Just make your own stuff and if handling more than modeling tasks doesn't sound good then not the career field for you anymore imo"
+  - ▲1 "I feel this sentiment all the time in production. I spend my time making someone's else's 'vision' but they never actually have one. I can't say that Ai is any different though. it's not real vision anymore than the corporate double speak that incompetent executives throw around and forget about. The apes are dumb and slow, the robots are dumb and fast. Asking which one is more useful is kind of the wrong question to ask."
+
+## [r/blender] Will Ai be able to take away jobs?
+- url: https://reddit.com/r/blender/comments/1v53i40/will_ai_be_able_to_take_away_jobs/
+- score: ▲0 · 8评论 · date: 2026-07-24
+- 楼主原声: In reality, I think the answer is a categorical "no." It is excellent as an AI assistant—after all, questions arise constantly—but handling the entire workflow from start to finish? That is unlikely. Of course, there are AI systems capable of managing the complete 3D graphics creation cycle, but the output still requires human refinement. Will AI ever reach a level where polygons, textures, and normal maps are truly clean and correct?
+- 高赞评论(原声):
+  - ▲3 "AI indirectly removes jobs by reducing the amount of people needed to make the same output. I have now had multiple people in my family directly affected by AI related lay offs, and it is only going to get worse. It is a categorical yes, and we're only just starting to see the effects."
+  - ▲2 "Haven't we discussed this topic for many times? I'm sure that sub rules banned this kind of tired posts."
+  - ▲1 "We will reshape the jobs such that AI can manage the complete workflow. Without legislation, that is an economic inevitability."
+  - ▲1 "Curious where are you all finding these AI 'do my job' tools? I really need one cause my projects are getting so time consuming lol. I have tried some 3D 'AI' like Meshy and Tripo and Claude MCP and the results so far are all disappointing. Outside of very trivial things like custom rig scripting (still have to tell Claude line by line what to do). The 3D mesh generated from Meshy and Tripo are just utter craps despite the advertisement, let alone the texturing, I don't know how can anyone use any of these. The AI mocap is decent but when it comes to mocap, fixing the mocap is like 90% of the actual work so I don't see the point. Also tried some AI image generation tools to help with making concept arts and references, my god they can't stop hallucinating and that's before I tell them to make multi views."
+  - ▲1 "The thing people often forget is that AI is being developed with AI. So AI can (and probably will) become better not linearly but exponentially. Commenting about the capabilities of a system that is developing as quickly as AI and is also subject to exponential change is almost pointless, because what's true now will not be true in a year. Will AI ever make perfect 3D models and textures with no human involvement (other than the initial prompt)? That's already within reach. Is that desirable? I don't think so. As often in technology: we spend too much time talking about if we can and not enough about if we should."
+
+## [r/3Dmodeling] How to get a 3DCharacter artist job in 2026?
+- url: https://reddit.com/r/3Dmodeling/comments/1t70q25/how_to_get_a_3dcharacter_artist_job_in_2026/
+- score: ▲750 · 104评论 · date: 2026-05-08
+- 楼主原声: Hi, I am currently 26 and trying very hard to get a 3D job. I have given a lot of art tests lately but haven't had any success. My school didn't have industry-experienced teachers, so I've been self-taught from the start. I began with stylized characters, but after struggling to find work there, I am now focusing on anatomy and realistic characters. To be honest, I am quite depressed and desperate to finally get a character artist job. Any help or guidance would mean a lot to me 😄
+- 高赞评论(原声):
+  - ▲282 "Your folios judged by your worst work as well as your best. Push that mushroom character up, set the purple haired anime girl to hidden. There's the big obvious gap of a AAA level realistic character. Without that any studio aiming for realism won't hire you if you don't show them you can do it. Also presentation. Breakdowns are good, I find putting a quick rig on something and having a high quality gif playing an animation can help too."
+  - ▲69 "character art is extremely competitive and you need to be really good at it. What you should ask yourself is, does any of your projects look like they could be from a AAA game or a Pixar movie? Cause that's the level your portfolio needs to be at to be competitive. When I look at your portfolio, your mushroom man looks fantastic… Just because something is made well, doesn't mean it's eye catching. Both the execution and design need to be amazing."
+  - ▲47 "I've been a character artist in the industry for over 20 years, with over a dozen shipped AAA titles. Honestly, your portfolio needs more work… You need to reach a 'minimum' bar of quality, and then it becomes all about personality and how you fit within a team. Only show your best work. You can get a job with 2-3 good pieces. Lower quality work devalues your entire portfolio. When I hire character artists, I have maybe 60 seconds to review someones portfolio…"
+  - ▲11 "First, nice pictures! Second, don't. Industry right now is fucking shit, I have a group friends of talented artists looking for job which slapped my face and told me to not waste money in art school. I am a noob here… but my suggestion is A) look for a stable and cozy job, something to pay rent, B) Work on your free time in your own stuff and monetize with a Patreon, Ko-fi or other means. Eventually in the futurw, with luck and portfolio industry will hire you and with good terms, maybe. Right now they are very busy worshipping the death machine cult and shooting themselves in the foot."
+  - ▲10 "Some lovely work. The industry is just in a very rough spot atm. If you read similar posts to yours, which appear once a week at least, you'll get all the details."
